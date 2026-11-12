@@ -52,7 +52,7 @@ Depende de E1.
 - La tarjeta del ejercicio muestra la sugerencia en una línea.
 - **Archivos:** `lib/progression.js` (nuevo), `components/ExerciseCard.jsx`.
 
-### ⬜ E3 · Plan de running por semanas
+### ✅ E3 · Plan de running por semanas
 Hoy el día de running tiene intervalos fijos (5 × 3 min de trote + 1 min de caminata).
 - `src/data/runPlan.js`: progresión de caminata-trote de 8 a 9 semanas, de bajo impacto.
 - `src/lib/runProgress.js` con pruebas: avanza de nivel al completar la sesión, repite si no se completó, retrocede un nivel tras dos semanas sin correr.

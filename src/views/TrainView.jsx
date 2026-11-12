@@ -3,6 +3,8 @@ import { Check, Zap, BatteryLow, Trophy } from "lucide-react";
 import { dkey, pruneDays } from "../lib/dates.js";
 import { usePersisted } from "../lib/storage.js";
 import { getLastExerciseLog, resolveDefaultSet, recordSet, removeSet, updateExerciseLoad } from "../lib/setLog.js";
+import { DEFAULT_RUN_LEVEL, getDisplayRunLevel, undoRunSession, hasInactivityDecay, applyInactivityDecay, recordRunSession } from "../lib/runProgress.js";
+import { MAX_RUN_LEVEL, getRunLevel } from "../data/runPlan.js";
 import { ROUTINES, BLOCK_WEEKS, effSets, routineById } from "../data/program.js";
 import { altFor } from "../data/subs.js";
 import { ProgressBar } from "../components/ui.jsx";
@@ -15,7 +17,10 @@ export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits,
   const [rid, setRid] = useState(() => wp.arr[wp.todayIdx] || wp.nextRid || "d1");
   const [swapFor, setSwapFor] = useState(null);
   const [seriesLog, setSeriesLog] = usePersisted("setLog", {});
-  const routine = routineById(rid);
+  const [runLevel, setRunLevel] = usePersisted("runLevel", DEFAULT_RUN_LEVEL);
+  const activeRunLevel = getDisplayRunLevel(runLevel, today);
+  const runPlan = getRunLevel(activeRunLevel);
+  const routine = routineById(rid, activeRunLevel);
   const week = block.week || 1;
   const daySets = (sets[today] || {})[rid] || {};
   const daySwaps = (swaps[today] || {})[rid] || {};
@@ -83,8 +88,20 @@ export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits,
   const logged = log[today];
 
   useEffect(() => {
+    if (hasInactivityDecay(runLevel, today)) {
+      setRunLevel((prev) => applyInactivityDecay(prev, today));
+    }
+  }, [runLevel, today, setRunLevel]);
+
+  useEffect(() => {
     if (progress >= 1 && (!logged || logged.r !== rid)) setLog((l) => ({ ...l, [today]: { r: rid, at: Date.now() } }));
   }, [progress, logged, rid, today, setLog]);
+
+  useEffect(() => {
+    if (logged && logged.r === "d3") {
+      setRunLevel((prev) => recordRunSession(prev, { date: today, done: true }));
+    }
+  }, [logged, today, setRunLevel]);
 
   const toggle = (ex, i, n) => {
     const exSeries = daySetLog[ex.id] || [];
@@ -203,6 +220,11 @@ export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits,
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">{routine.short} · ~{routine.minutes} min · Semana {week} {bw.label}</div>
               <h1 className="font-display text-3xl font-semibold uppercase leading-[0.95] md:text-4xl">{routine.name}</h1>
               <p className="mt-1 max-w-prose text-sm text-muted">{routine.focus}</p>
+              {rid === "d3" && (
+                <p className="mt-1.5 text-xs font-medium text-accent">
+                  Nivel {runPlan.level} de {MAX_RUN_LEVEL} · {runPlan.reps} × {runPlan.runMin} min trote + {runPlan.walkMin} min caminata
+                </p>
+              )}
             </div>
             <button onClick={openWarmup} className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accentInk shadow-lg"><Zap size={16} />Modo Arranque (5 min)</button>
           </div>
@@ -213,7 +235,7 @@ export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits,
           {logged ? (
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
               <span className="inline-flex items-center gap-1.5 text-good"><Trophy size={14} />Sesión registrada hoy: {routineById(logged.r).name}</span>
-              <button onClick={() => setLog((l) => { const n = { ...l }; delete n[today]; return n; })} className="rounded-lg px-2 py-1 text-muted hover:bg-surface2 hover:text-fg">Quitar registro</button>
+              <button onClick={() => { if (logged.r === "d3") setRunLevel((prev) => undoRunSession(prev, today)); setLog((l) => { const n = { ...l }; delete n[today]; return n; }); }} className="rounded-lg px-2 py-1 text-muted hover:bg-surface2 hover:text-fg">Quitar registro</button>
             </div>
           ) : (
             <button onClick={() => setLog((l) => ({ ...l, [today]: { r: rid, at: Date.now() } }))} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-good/40 px-3 py-1.5 text-xs text-good hover:bg-good/10">
