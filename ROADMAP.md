@@ -81,22 +81,23 @@ Proyecto personal y gratuito de Google Cloud con la Google Health API (cliente O
 
 ## Fase 5 · Entrenos reales y avisos
 
-### ⬜ N1 · Avisos del servidor: renovar Google Health y resumen semanal
+### ✅ N1 · Avisos del servidor: renovar Google Health y resumen semanal
 Solo toca `scripts/recordatorios.mjs` y `tests/`. El repo privado y sus workflows los actualiza Claude después; no los toques.
 - `scripts/recordatorios.mjs` gana dos modos por línea de comandos, reutilizando el envío Web Push que ya existe:
   - `--aviso "<título>" "<texto>"`: envía ese aviso a todos los dispositivos suscritos, sin horario silencioso. Lo usará la tarea «Google Health» cuando Google rechace la autorización («Renueva Google Health: corre el script en tu Mac»).
   - `--resumen`: arma y envía un resumen de los últimos 7 días leyendo `data.json`: entrenos y minutos por tipo (clave `workouts`), % de días con todos los hábitos obligatorios cumplidos y la racha actual (reusa `src/lib/habitStats.js` si se importa sin interfaz; si no, función pura propia). Máximo ~3 líneas.
 - Funciones puras exportadas (`buildWeeklySummary(data, now)`, …) con pruebas. El modo normal (recordatorios por hora) no cambia. Ambos modos aceptan `--test` para imprimir sin enviar.
 - **Listo cuando:** `npm test` pasa y `--resumen --test` imprime un resumen con un `data.json` de ejemplo.
+- Hecho: el repo privado tiene la copia del script, el workflow «Resumen semanal» (domingos 7:00 p.m.) y el aviso de renovar en «Google Health» (una vez al día, solo si Google rechazó la autorización).
 
-### ⬜ N2 · El plan semanal cuenta los entrenos de Fitbit
+### 🟨 N2 · El plan semanal cuenta los entrenos de Fitbit
 - Los entrenos reales (`usePersisted("workouts", [])`, solo lectura; formato en S1/S3) se cruzan con la semana del plan: un día con un entreno `strength` o `run` de 20 min o más cuenta como sesión hecha aunque no se haya marcado en Espaldera; uno `other` (raqueta, fútbol, «Activity») de 30 min o más cuenta como esfuerzo para las reglas de fatiga (no poner el Día 2 de pierna al día siguiente).
 - La tarjeta de la semana marca con un ícono distinto los días cubiertos por un entreno de Fitbit, con tipo y minutos.
 - Lógica pura en `src/lib/planner.js` (o archivo nuevo en `lib/`) con pruebas; no escribir la clave `workouts`.
 - **Archivos:** `lib/planner.js`, `components/WeekCard.jsx`, pruebas. No toques `views/TrainView.jsx` (lo usa N3).
 - **Listo cuando:** se ve bien a 375 px y «Reacomodar» respeta lo ya hecho en Fitbit.
 
-### ⬜ N3 · Empezar el entreno en Fitbit desde Espaldera
+### ✅ N3 · Empezar el entreno en Fitbit desde Espaldera
 Hoy el usuario abre Fitbit, inicia el ejercicio y luego vuelve a Espaldera para hacer su rutina.
 - Botón «Empezar con Fitbit» en el encabezado de la rutina del día (`views/TrainView.jsx`) que abre `shortcuts://run-shortcut?name=<nombre>` para correr un Atajo de iOS del usuario. Nombre configurable en Ajustes (por defecto «Entreno Fitbit»); el botón se puede ocultar.
 - Tarjeta en Ajustes con la guía corta para crear el Atajo: acción «Abrir app» → Fitbit (o, si Fitbit ofrece en Atajos una acción para iniciar un ejercicio, usar esa). Al terminar, el usuario vuelve a Espaldera con el gesto de volver de iOS.
