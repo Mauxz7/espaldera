@@ -131,7 +131,7 @@ export function HabitsView({ habits, setHabits, habitDefs, tomorrow, tonight }) 
             return (
               <div key={hb.id} className="rounded-xl border border-line bg-surface2 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <div className="flex min-w-0 flex-1 basis-full items-center gap-2 sm:basis-auto">
                     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-surface text-muted">
                       <Icon size={13} />
                     </span>

@@ -160,3 +160,10 @@ test("suggestProgression devuelve null cuando no hay historial o el rango no es 
     null
   );
 });
+
+test("suggestProgression sin carga registrada sugiere lastre o variante en vez de subir carga", () => {
+  const res = suggestProgression([{ reps: 6 }, { reps: 6 }, { reps: 6 }, { reps: 6 }], "4–6", 4);
+  assert.equal(res.type, "load");
+  assert.match(res.text, /lastre o variante/);
+  assert.doesNotMatch(res.text, /sube carga/);
+});

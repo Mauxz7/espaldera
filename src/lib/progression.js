@@ -197,8 +197,9 @@ export function suggestProgression(historyOrOptions, repsSpec, targetSets) {
   // 2. Si todas las series llegaron al tope del rango (o lo superaron) -> subir carga
   if (minRepsDone >= range.max) {
     const goalReps = range.min;
-    const loadHint = load ? ` (>${load})` : "";
-    const text = `Meta hoy: sube carga${loadHint} · ${expectedSets} × ${goalReps} ${unitLabel}`;
+    // Sin carga registrada (peso corporal): sugerir lastre o una variante más dura.
+    const head = load ? `sube carga (>${load})` : "más difícil (lastre o variante)";
+    const text = `Meta hoy: ${head} · ${expectedSets} × ${goalReps} ${unitLabel}`;
     return {
       type: "load",
       action: "load",
