@@ -46,7 +46,7 @@ Hoy cada serie es una casilla y hay un único campo «Carga» por ejercicio.
 - **Archivos:** `components/ExerciseCard.jsx`, `views/TrainView.jsx`, `lib/storage.js` (solo `SYNC_KEYS`).
 - **Listo cuando:** marcar series sigue siendo un toque; lo registrado aparece al volver a esa rutina otro día.
 
-### ⬜ E2 · Sugerencia de progresión
+### ✅ E2 · Sugerencia de progresión
 Depende de E1.
 - Función pura `src/lib/progression.js` con pruebas: dado el historial de un ejercicio y su rango de reps, sugiere la meta de hoy (subir una repetición, subir carga al llegar al tope del rango, o repetir si no se completó).
 - La tarjeta del ejercicio muestra la sugerencia en una línea.

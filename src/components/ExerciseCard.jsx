@@ -1,9 +1,10 @@
 import { useState, useRef } from "react";
-import { X, Check, ChevronDown, Info, ArrowLeftRight, Undo2, History, Pencil } from "lucide-react";
+import { X, Check, ChevronDown, Info, ArrowLeftRight, Undo2, History, Pencil, TrendingUp } from "lucide-react";
 import { fmtShort } from "../lib/dates.js";
 import { EQ, effSets, effRir } from "../data/program.js";
 import { SUB_KIND, SUBS } from "../data/subs.js";
 import { parseTargetReps } from "../lib/setLog.js";
+import { suggestProgression } from "../lib/progression.js";
 import { Chip } from "./ui.jsx";
 
 export function SwapModal({ ex, week, current, onPick, onClose }) {
@@ -76,6 +77,7 @@ export function ExerciseCard({
   const n = effSets(original, week);
   const count = done.filter(Boolean).length;
   const complete = count >= n;
+  const progression = suggestProgression(last, ex.reps, n);
 
   const openEdit = (i) => {
     let initialReps;
@@ -193,6 +195,20 @@ export function ExerciseCard({
             {last.reps && <span className="text-muted">({last.reps})</span>}
           </div>
         )
+      )}
+      {progression && (
+        <div
+          className={`mt-1.5 flex items-center gap-1.5 text-xs ${
+            progression.type === "load"
+              ? "text-good"
+              : progression.type === "reps"
+                ? "text-accent"
+                : "text-warn"
+          }`}
+        >
+          <TrendingUp size={13} className="shrink-0" />
+          <span className="truncate">{progression.text}</span>
+        </div>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {Array.from({ length: n }).map((_, i) => (
