@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Check, Zap, BatteryLow, Trophy } from "lucide-react";
+import { Check, Zap, BatteryLow, Trophy, Watch } from "lucide-react";
 import { dkey, pruneDays } from "../lib/dates.js";
 import { usePersisted } from "../lib/storage.js";
 import { getLastExerciseLog, resolveDefaultSet, recordSet, removeSet, updateExerciseLoad } from "../lib/setLog.js";
@@ -11,6 +11,7 @@ import { ProgressBar } from "../components/ui.jsx";
 import { WeekCard } from "../components/WeekCard.jsx";
 import { HabitsMini } from "../components/Habits.jsx";
 import { SwapModal, ExerciseCard } from "../components/ExerciseCard.jsx";
+import { useFitbitShortcut, buildFitbitShortcutUrl } from "../components/FitbitShortcutCard.jsx";
 
 export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits, setHabits, habitDefs, swaps, setSwaps, loads, setLoads, lastLoads, setLastLoads, startTimer, openWarmup, wp }) {
   const today = dkey();
@@ -18,6 +19,7 @@ export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits,
   const [swapFor, setSwapFor] = useState(null);
   const [seriesLog, setSeriesLog] = usePersisted("setLog", {});
   const [runLevel, setRunLevel] = usePersisted("runLevel", DEFAULT_RUN_LEVEL);
+  const [fitbitShortcut] = useFitbitShortcut();
   const activeRunLevel = getDisplayRunLevel(runLevel, today);
   const runPlan = getRunLevel(activeRunLevel);
   const routine = routineById(rid, activeRunLevel);
@@ -226,7 +228,18 @@ export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits,
                 </p>
               )}
             </div>
-            <button onClick={openWarmup} className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accentInk shadow-lg"><Zap size={16} />Modo Arranque (5 min)</button>
+            <div className="flex flex-wrap items-center gap-2">
+              {!fitbitShortcut.hidden && (
+                <a
+                  href={buildFitbitShortcutUrl(fitbitShortcut.name)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface2 px-3.5 py-2.5 text-sm font-semibold text-fg transition hover:border-accent hover:text-accent"
+                >
+                  <Watch size={16} className="text-accent" />
+                  Empezar con Fitbit
+                </a>
+              )}
+              <button onClick={openWarmup} className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accentInk shadow-lg"><Zap size={16} />Modo Arranque (5 min)</button>
+            </div>
           </div>
           <div className="mt-4 flex items-center gap-3">
             <ProgressBar value={progress} />
