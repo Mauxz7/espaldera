@@ -19,6 +19,7 @@ import { hhmm } from "../lib/dates.js";
 import { DEFAULT_HABIT_DEFS, getHabitIcon } from "../data/habits.js";
 import { PushCard } from "../components/PushCard.jsx";
 import { HealthIntakeCard } from "../components/HealthIntakeCard.jsx";
+import { FitbitShortcutCard } from "../components/FitbitShortcutCard.jsx";
 
 export const SYNC_ERRORS = {
   401: "GitHub rechazó la clave: está mal copiada o venció. Pega una nueva.",
@@ -497,6 +498,7 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
         {reminderCard}
         <PushCard />
         <HealthIntakeCard />
+        <FitbitShortcutCard />
         <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">
           <h2 className="mb-1 font-display text-lg font-semibold uppercase tracking-wide">Versión</h2>
           <p className="text-sm text-muted">La app se actualiza sola en todos tus dispositivos cuando hay cambios.</p>
