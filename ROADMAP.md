@@ -63,8 +63,10 @@ Hoy el día de running tiene intervalos fijos (5 × 3 min de trote + 1 min de ca
 
 ## Fase 4 · Datos de salud
 
-### ⬜ S1 · Recepción de entrenos · **Reservada para Claude**
+### ✅ S1 · Recepción de entrenos · **Reservada para Claude**
 Formato y canal para que un Atajo del iPhone envíe los entrenos de Apple Health al repositorio privado.
+- Hecho: el Atajo crea `health/inbox/<marca>.txt` (una línea por entreno: `tipo | inicio | fin | duración`); el workflow «Entrenos» del repo privado corre `scripts/entrenos.mjs` (copia de la de este repo, con pruebas) y deja la lista en la clave sincronizada `workouts` (`[{ id, type, kind: run|bike|walk|strength|other, start, end, min }]`, del más reciente al más viejo). La guía del Atajo está en Ajustes (`components/HealthIntakeCard.jsx`).
+- Para S2: leer `usePersisted("workouts", [])`; no escribir esa clave desde la app.
 
 ### ⬜ S2 · Vista de entrenos
 Depende de S1. Lista y resumen semanal de entrenos (Fitbit y Strava) en la pestaña Salud.
