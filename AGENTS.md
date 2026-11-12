@@ -10,7 +10,7 @@ Espaldera es una app web instalable (PWA) de entrenamiento y hábitos para **un 
 
 1. **Costo cero.** Nada de servicios de pago, cuentas de desarrollador de Apple ni Xcode. Todo corre en el navegador y en GitHub (plan gratuito).
 2. **Este repositorio es público.** No escribas aquí datos personales: nombres, correos, métricas de salud reales, claves ni identificadores de otras cuentas. Los datos del usuario viven en sus dispositivos y en un repositorio privado aparte.
-3. **`main` es producción.** Un merge a `main` publica a los dispositivos del usuario en minutos. Trabaja en una rama por tarea y abre un pull request; no hagas push directo a `main`.
+3. **`main` es producción.** Un merge a `main` publica a los dispositivos del usuario en minutos. Trabaja en una rama por tarea y abre un pull request; no hagas push directo a `main`. **Nunca unas tu propio pull request** (`gh pr merge`, botón Merge ni equivalente), aunque las pruebas pasen: lo revisa y lo une otra persona. Tu trabajo termina al abrir el pull request.
 4. **No rompas los datos guardados.** El usuario ya tiene datos. Puedes agregar claves nuevas; no renombres ni cambies la forma de las existentes sin una migración que conserve lo guardado.
 5. **Texto en español, tratando al usuario de «tú»** (toca, marca, elige), nunca voseo ni «usted».
 6. **Bajo impacto.** Las rutinas priorizan estabilidad de rodilla y tobillo y siempre ofrecen una alternativa sin saltos.
