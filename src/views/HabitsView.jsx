@@ -1,7 +1,7 @@
 import { Flame, AlarmClock } from "lucide-react";
 import { dkey, fromKey, addDays, DAYS, DAYS_LONG, clockAm } from "../lib/dates.js";
 import { routineById } from "../data/program.js";
-import { HABITS_REQ, HABITS_OPT, reqDone, optDone } from "../data/habits.js";
+import { DEFAULT_HABIT_DEFS, reqDone, optDone, isHabitDone } from "../data/habits.js";
 import { Chip } from "../components/ui.jsx";
 import { HabitsMini } from "../components/Habits.jsx";
 
@@ -47,12 +47,15 @@ export const PROTEIN_RULES = [
   { h: "Kit de emergencia anti comida rápida", d: "En la mochila: batido listo para tomar, atún en lata, maní y fruta. En casa: huevos, queso cottage, tortillas y frijoles para una cena de 10 minutos." },
 ];
 
-export function HabitsView({ habits, setHabits, tomorrow, tonight }) {
+export function HabitsView({ habits, setHabits, habitDefs, tomorrow, tonight }) {
+  const defs = habitDefs || DEFAULT_HABIT_DEFS;
+  const reqDefs = defs.filter((d) => !d.archived && (!d.group || d.group === "req"));
+  const optDefs = defs.filter((d) => !d.archived && d.group === "opt");
   const last7 = Array.from({ length: 7 }, (_, i) => dkey(addDays(new Date(), i - 6)));
   let streak = 0;
   for (let i = 6; i >= 0; i--) {
     const h = habits[last7[i]] || {};
-    const all = reqDone(h) === HABITS_REQ.length;
+    const all = reqDefs.length > 0 && reqDone(h, reqDefs) === reqDefs.length;
     if (all) streak++;
     else if (i !== 6) break;
   }
@@ -69,20 +72,23 @@ export function HabitsView({ habits, setHabits, tomorrow, tonight }) {
             <h2 className="font-display text-lg font-semibold uppercase tracking-wide">Checklist de hoy</h2>
             <Chip tone={streak ? "good" : "plain"}><Flame size={11} />{streak} {streak === 1 ? "día" : "días"} completos</Chip>
           </div>
-          <HabitsMini habits={habits} setHabits={setHabits} />
+          <HabitsMini habits={habits} setHabits={setHabits} habitDefs={defs} />
           <div className="mt-4 grid grid-cols-7 gap-1">
             {last7.map((k) => {
               const h = habits[k] || {};
-              const n = reqDone(h);
-              const b = optDone(h);
+              const n = reqDone(h, reqDefs);
+              const totalReq = reqDefs.length || 1;
+              const allDone = reqDefs.length > 0 && n === reqDefs.length;
               return (
                 <div key={k} className="text-center">
                   <div className="text-[10px] text-muted">{DAYS[(fromKey(k).getDay() + 6) % 7]}</div>
                   <div className="mx-auto mt-1 flex h-10 w-6 flex-col-reverse overflow-hidden rounded-md bg-surface2">
-                    <div className={n === HABITS_REQ.length ? "bg-good" : "bg-accent"} style={{ height: `${(n / HABITS_REQ.length) * 100}%` }} />
+                    <div className={allDone ? "bg-good" : "bg-accent"} style={{ height: `${(n / totalReq) * 100}%` }} />
                   </div>
                   <div className="mt-1 flex justify-center gap-0.5">
-                    {HABITS_OPT.map((x, i) => <span key={x.id} className={`h-1.5 w-1.5 rounded-full ${i < b ? "bg-cool" : "bg-surface2"}`} />)}
+                    {optDefs.map((x) => (
+                      <span key={x.id} className={`h-1.5 w-1.5 rounded-full ${isHabitDone(x, h[x.id]) ? "bg-cool" : "bg-surface2"}`} />
+                    ))}
                   </div>
                 </div>
               );
