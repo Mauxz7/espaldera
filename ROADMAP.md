@@ -26,7 +26,7 @@ Depende de H1.
 - En la pestaña Hábitos: una fila por hábito con su racha y una tira de los últimos 30 días.
 - **Archivos:** `lib/habitStats.js` (nuevo), `views/HabitsView.jsx`.
 
-### ⬜ H3 · Recordatorios por hábito con la app abierta
+### ✅ H3 · Recordatorios por hábito con la app abierta
 Depende de H1.
 - Generalizar `src/lib/reminder.jsx`: hoy solo avisa de la creatina desde las 12:00. Debe avisar de cualquier hábito con `remindAt` que siga pendiente, repitiendo cada hora en punto hasta marcarlo.
 - Un solo aviso en pantalla que liste los pendientes, cada uno con su botón de marcar.
