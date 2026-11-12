@@ -16,9 +16,9 @@ export const KEEP_DAYS = 400;
 export function classify(type) {
   const t = String(type || "").toLowerCase();
   if (/run|corr|carrera|trote/.test(t)) return "run";
-  if (/cycl|bici|ciclis|spinning|ride/.test(t)) return "bike";
+  if (/cycl|bici|bik|ciclis|spinning|ride/.test(t)) return "bike";
   if (/walk|camin|hik|senderis/.test(t)) return "walk";
-  if (/strength|fuerza|funcional|functional|hiit|highintensity|core|cross|calisten|pesas|weight/.test(t)) return "strength";
+  if (/strength|fuerza|funcional|functional|hiit|highintensity|interval|core|cross|calisten|pesas|weight|circuit/.test(t)) return "strength";
   return "other";
 }
 
@@ -77,7 +77,7 @@ export function mergeWorkouts(current, incoming, now = new Date()) {
 }
 
 // Fusiona entrenos nuevos en health/workouts.json (copia maestra) y en la clave «workouts» de data.json.
-// La usan este receptor y el de Strava (scripts/strava.mjs).
+// La usan este receptor y el de Google Health (scripts/google-health.mjs).
 export function applyWorkouts({ root = process.cwd(), incoming = [], now = new Date() } = {}) {
   const dataPath = path.join(root, "data.json");
   const data = fs.existsSync(dataPath) ? JSON.parse(fs.readFileSync(dataPath, "utf8")) : {};

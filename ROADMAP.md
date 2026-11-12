@@ -72,11 +72,12 @@ Formato y canal para que un Atajo del iPhone envíe los entrenos de Apple Health
 ### ✅ S2 · Vista de entrenos
 Depende de S1. Lista y resumen semanal de entrenos (Fitbit y Strava) en la pestaña Salud.
 
-### ✅ S3 · Entrenos de Fitbit vía Strava · **Reservada para Claude**
-Fitbit → app Google Health → conexión oficial con Strava (sube cada entreno nuevo, con o sin GPS) → workflow «Strava» del repo privado (4 veces al día) → clave `workouts`.
-- `scripts/strava.mjs` (copia en el repo privado junto con `scripts/entrenos.mjs`, que ahora exporta `applyWorkouts`). Entrenos con `source: "strava"` y `km` opcional; mismo `id` que el Atajo, así nada se duplica.
-- Autorización una sola vez con `node scripts/strava-auth.mjs` (guarda los secretos `STRAVA_*` con `gh secret set`). Si Strava rota el token, se guarda cifrado en `strava/token.enc` del repo privado.
-- La API vieja de Fitbit se apagó en noviembre de 2026 y la Google Health API exige revisión de Google; por eso el puente es Strava.
+### ✅ S3 · Entrenos de Fitbit vía Google Health API · **Reservada para Claude**
+Proyecto personal y gratuito de Google Cloud con la Google Health API (cliente OAuth «Desktop», permiso de solo lectura
+`googlehealth.activity_and_fitness.readonly`) → workflow «Google Health» del repo privado (4 veces al día) → clave `workouts`.
+- `scripts/google-health.mjs` (copia en el repo privado junto con `scripts/entrenos.mjs`, que exporta `applyWorkouts`). Lee `users/me/dataTypes/exercise/dataPoints` filtrando por `exercise.interval.civil_start_time`. Entrenos con `source: "google"` y `km` opcional; mismo `id` que el Atajo, así nada se duplica.
+- Autorización con `node scripts/google-health-auth.mjs` (guarda los secretos `GOOGLE_HEALTH_*` con `gh secret set`). Con la app en modo prueba, Google vence el acceso cada 7 días: la tarea falla con un mensaje claro y se repite el script.
+- Descartados: Atajos (iOS no lee entrenamientos), la API vieja de Fitbit (apagada en noviembre de 2026) y Strava (su API es de pago).
 
 ## Qué se puede hacer en paralelo ahora
 
