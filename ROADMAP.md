@@ -90,7 +90,7 @@ Solo toca `scripts/recordatorios.mjs` y `tests/`. El repo privado y sus workflow
 - **Listo cuando:** `npm test` pasa y `--resumen --test` imprime un resumen con un `data.json` de ejemplo.
 - Hecho: el repo privado tiene la copia del script, el workflow «Resumen semanal» (domingos 7:00 p.m.) y el aviso de renovar en «Google Health» (una vez al día, solo si Google rechazó la autorización).
 
-### 🟨 N2 · El plan semanal cuenta los entrenos de Fitbit
+### ✅ N2 · El plan semanal cuenta los entrenos de Fitbit
 - Los entrenos reales (`usePersisted("workouts", [])`, solo lectura; formato en S1/S3) se cruzan con la semana del plan: un día con un entreno `strength` o `run` de 20 min o más cuenta como sesión hecha aunque no se haya marcado en Espaldera; uno `other` (raqueta, fútbol, «Activity») de 30 min o más cuenta como esfuerzo para las reglas de fatiga (no poner el Día 2 de pierna al día siguiente).
 - La tarjeta de la semana marca con un ícono distinto los días cubiertos por un entreno de Fitbit, con tipo y minutos.
 - Lógica pura en `src/lib/planner.js` (o archivo nuevo en `lib/`) con pruebas; no escribir la clave `workouts`.
