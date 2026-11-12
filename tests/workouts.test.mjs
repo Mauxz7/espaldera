@@ -129,3 +129,18 @@ test("KIND_LABELS expone las etiquetas en español requeridas", () => {
     other: "Otro",
   });
 });
+
+test("lastWeeks devuelve 8 semanas seguidas con ceros donde no hubo entrenos", async () => {
+  const { lastWeeks } = await import("../src/lib/workouts.js");
+  const today = new Date(2026, 10, 12, 12); // jueves 12 nov 2026, hora local
+  const weeks = lastWeeks([
+    { id: "a", type: "Correr", kind: "run", start: new Date(2026, 10, 10, 7).toISOString(), min: 30 },
+    { id: "b", type: "Caminar", kind: "walk", start: new Date(2026, 9, 20, 18).toISOString(), min: 40 },
+  ], 8, today);
+  assert.equal(weeks.length, 8);
+  assert.equal(weeks[7].weekStart, "2026-11-09");
+  assert.equal(weeks[0].weekStart, "2026-09-21");
+  assert.equal(weeks[7].run, 30);
+  assert.equal(weeks.find((w) => w.weekStart === "2026-10-19").walk, 40);
+  assert.equal(weeks.filter((w) => w.count === 0).length, 6);
+});

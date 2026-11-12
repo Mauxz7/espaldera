@@ -107,3 +107,22 @@ export function groupWorkoutsByWeek(workouts, maxWeeks) {
   }
   return sorted;
 }
+
+/**
+ * Las últimas `n` semanas del calendario (de lunes a domingo, hora local) que terminan en la semana
+ * de `today`, incluidas las semanas sin entrenos en cero, para que el gráfico no oculte huecos.
+ */
+export function lastWeeks(workouts, n = 8, today = new Date()) {
+  const byStart = new Map(groupWorkoutsByWeek(workouts).map((w) => [w.weekStart, w]));
+  const thisMonday = mondayOf(today);
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(thisMonday);
+    d.setDate(d.getDate() - 7 * (n - 1 - i));
+    const key = dkey(d);
+    return byStart.get(key) || {
+      weekStart: key, week: fmtShort(key), count: 0, totalMin: 0, min: 0,
+      run: 0, bike: 0, walk: 0, strength: 0, other: 0,
+      byKind: { run: 0, bike: 0, walk: 0, strength: 0, other: 0 },
+    };
+  });
+}

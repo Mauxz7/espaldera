@@ -6,7 +6,7 @@ import { GH_SEED, SAMPLE_EMAIL, parseHealth, deriveWeek, fmtRange } from "../lib
 import { computeStreak } from "../lib/planner.js";
 import { usePersisted } from "../lib/storage.js";
 import { routineById } from "../data/program.js";
-import { WORKOUT_KINDS, KIND_LABELS, validWorkouts, groupWorkoutsByWeek } from "../lib/workouts.js";
+import { WORKOUT_KINDS, KIND_LABELS, validWorkouts, lastWeeks } from "../lib/workouts.js";
 import { Chip } from "../components/ui.jsx";
 
 const KIND_ICON = {
@@ -207,7 +207,7 @@ export function ImportPanel({ onSave, onClose, initial }) {
 
 export function WorkoutsSection({ workouts, log }) {
   const list = useMemo(() => validWorkouts(workouts), [workouts]);
-  const weekly = useMemo(() => groupWorkoutsByWeek(list, 8), [list]);
+  const weekly = useMemo(() => lastWeeks(list, 8), [list]);
   const recent = useMemo(() => list.slice(0, 10), [list]);
 
   if (!list.length) {
