@@ -7,7 +7,7 @@ const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12); // AA
 rmSync("docs", { recursive: true, force: true });
 mkdirSync("docs");
 cpSync("public", "docs", { recursive: true });
-writeFileSync("docs/sw.js", readFileSync("public/sw.js", "utf8").replace("__BUILD__", stamp));
+writeFileSync("docs/sw.js", readFileSync("public/sw.js", "utf8").replaceAll("__BUILD__", stamp));
 writeFileSync("docs/.nojekyll", "");
 await build({
   entryPoints: ["src/main.jsx"], bundle: true, minify: true, format: "iife", target: "es2019",

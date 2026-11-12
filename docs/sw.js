@@ -1,6 +1,6 @@
 // Service worker: guarda la app para abrirla al instante y sin conexión.
-// 202611120010 cambia en cada publicación, y eso es lo que dispara la actualización en cada dispositivo.
-const VERSION = "__BUILD__";
+// 202611120012 cambia en cada publicación, y eso es lo que dispara la actualización en cada dispositivo.
+const VERSION = "202611120012";
 const CACHE = "espaldera-" + VERSION;
 const CORE = ["./", "./index.html", "./app.js", "./app.css", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 
