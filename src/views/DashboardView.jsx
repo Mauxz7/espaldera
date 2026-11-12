@@ -1,10 +1,29 @@
 import { useState, useMemo } from "react";
 import { ResponsiveContainer, ComposedChart, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from "recharts";
-import { Dumbbell, Activity, X, Zap, Trophy, Footprints, ClipboardPaste, Save, Trash2, Moon, Flame, TrendingUp, TrendingDown, CalendarDays } from "lucide-react";
-import { pad, dkey, fromKey, addDays, mondayOf, DAYS, DAYS_LONG, fmtShort, fmtInt, fmtSleep } from "../lib/dates.js";
+import { Dumbbell, Activity, Bike, X, Zap, Trophy, Footprints, ClipboardPaste, Save, Trash2, Moon, Flame, TrendingUp, TrendingDown, CalendarDays } from "lucide-react";
+import { pad, dkey, fromKey, addDays, mondayOf, DAYS, DAYS_LONG, fmtShort, fmtInt, fmtSleep, hhmm } from "../lib/dates.js";
 import { GH_SEED, SAMPLE_EMAIL, parseHealth, deriveWeek, fmtRange } from "../lib/health.js";
 import { computeStreak } from "../lib/planner.js";
+import { usePersisted } from "../lib/storage.js";
+import { routineById } from "../data/program.js";
+import { WORKOUT_KINDS, KIND_LABELS, validWorkouts, groupWorkoutsByWeek } from "../lib/workouts.js";
 import { Chip } from "../components/ui.jsx";
+
+const KIND_ICON = {
+  run: Flame,
+  bike: Bike,
+  walk: Footprints,
+  strength: Dumbbell,
+  other: Activity,
+};
+
+const KIND_COLOR = {
+  run: "var(--accent)",
+  bike: "var(--warn)",
+  walk: "var(--cool)",
+  strength: "var(--good)",
+  other: "var(--muted)",
+};
 
 export function Kpi({ label, value, sub, icon: Icon, badge, delta, invert }) {
   const good = delta != null && (invert ? delta <= 0 : delta >= 0);
@@ -186,7 +205,89 @@ export function ImportPanel({ onSave, onClose, initial }) {
   );
 }
 
+export function WorkoutsSection({ workouts, log }) {
+  const list = useMemo(() => validWorkouts(workouts), [workouts]);
+  const weekly = useMemo(() => groupWorkoutsByWeek(list, 8), [list]);
+  const recent = useMemo(() => list.slice(0, 10), [list]);
+
+  if (!list.length) {
+    return (
+      <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">
+        <h2 className="mb-1 font-display text-lg font-semibold uppercase tracking-wide">Entrenos</h2>
+        <p className="text-sm text-muted">
+          Todavía no llegan entrenos. El Atajo se configura en Ajustes → «Entrenos de Apple Health».
+        </p>
+      </section>
+    );
+  }
+
+  const totalCount8w = weekly.reduce((s, w) => s + w.count, 0);
+  const totalMin8w = weekly.reduce((s, w) => s + w.totalMin, 0);
+
+  return (
+    <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-display text-lg font-semibold uppercase tracking-wide">Entrenos</h2>
+        <Chip>{totalCount8w} {totalCount8w === 1 ? "entreno" : "entrenos"} · {fmtInt(totalMin8w)} min (8 sem)</Chip>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="min-w-0">
+          <div className="mb-2 text-xs text-muted">Resumen de las últimas 8 semanas (min por tipo)</div>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={weekly} margin={{ top: 8, right: 4, left: -14, bottom: 0 }}>
+                <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 3" />
+                <XAxis dataKey="week" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={8} />
+                <YAxis tick={axisTick} axisLine={false} tickLine={false} />
+                <Tooltip {...chartTooltip} formatter={(v, n) => [`${fmtInt(v)} min`, n]} />
+                <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" iconSize={8} />
+                {WORKOUT_KINDS.map((k) => (
+                  <Bar key={k} isAnimationActive={false} stackId="min" dataKey={k} name={KIND_LABELS[k]} fill={KIND_COLOR[k]} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <div className="mb-2 text-xs text-muted">Últimos {recent.length} entrenos</div>
+          <ul className="divide-y divide-line">
+            {recent.map((w) => {
+              const Icon = KIND_ICON[w.kind] || Activity;
+              const logged = log && log[w.date] && log[w.date].r ? routineById(log[w.date].r) : null;
+              return (
+                <li key={w.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-surface2 text-accent">
+                      <Icon size={16} />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="truncate font-medium text-fg">{w.type}</span>
+                        <span className="text-xs text-muted">· {KIND_LABELS[w.kind]}</span>
+                        {logged && <Chip tone="accent">{logged.short}</Chip>}
+                      </div>
+                      <div className="font-mono text-xs text-muted">
+                        {fmtShort(w.date)} · {hhmm(new Date(w.start))}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="shrink-0 font-mono text-xs text-fg tabular-nums">
+                    {w.min != null ? `${fmtInt(w.min)} min` : "—"}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function DashboardView({ health, setHealth, log }) {
+  const [workouts] = usePersisted("workouts", []);
   const [showImport, setShowImport] = useState(false);
   const [editing, setEditing] = useState(null);
   const [confirmDel, setConfirmDel] = useState(null);
@@ -223,10 +324,13 @@ export function DashboardView({ health, setHealth, log }) {
 
   if (!cur) {
     return (
-      <div className="rounded-2xl border border-line bg-surface p-6 text-center">
-        <p className="text-sm text-muted">No hay semanas en el historial.</p>
-        <button onClick={() => setShowImport(true)} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accentInk"><ClipboardPaste size={16} />Importar correo</button>
-        {showImport && <ImportPanel onSave={saveWeek} onClose={() => setShowImport(false)} />}
+      <div className="space-y-5">
+        <div className="rounded-2xl border border-line bg-surface p-6 text-center">
+          <p className="text-sm text-muted">No hay semanas en el historial.</p>
+          <button onClick={() => setShowImport(true)} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accentInk"><ClipboardPaste size={16} />Importar correo</button>
+          {showImport && <ImportPanel onSave={saveWeek} onClose={() => setShowImport(false)} />}
+        </div>
+        <WorkoutsSection workouts={workouts} log={log} />
       </div>
     );
   }
@@ -343,6 +447,8 @@ export function DashboardView({ health, setHealth, log }) {
           </div>
         </section>
       </div>
+
+      <WorkoutsSection workouts={workouts} log={log} />
 
       <section className="rounded-2xl border border-line bg-surface p-4">
         <h2 className="mb-3 font-display text-lg font-semibold uppercase tracking-wide">Historial</h2>
