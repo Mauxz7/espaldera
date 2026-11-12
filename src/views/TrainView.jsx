@@ -8,7 +8,7 @@ import { WeekCard } from "../components/WeekCard.jsx";
 import { HabitsMini } from "../components/Habits.jsx";
 import { SwapModal, ExerciseCard } from "../components/ExerciseCard.jsx";
 
-export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits, setHabits, swaps, setSwaps, loads, setLoads, lastLoads, setLastLoads, startTimer, openWarmup, wp }) {
+export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits, setHabits, habitDefs, swaps, setSwaps, loads, setLoads, lastLoads, setLastLoads, startTimer, openWarmup, wp }) {
   const today = dkey();
   const [rid, setRid] = useState(() => wp.arr[wp.todayIdx] || wp.nextRid || "d1");
   const [swapFor, setSwapFor] = useState(null);
@@ -138,7 +138,7 @@ export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits,
 
         <section className="rounded-2xl border border-line bg-surface p-4">
           <h2 className="mb-2 font-display text-lg font-semibold uppercase tracking-wide">Hábitos de hoy</h2>
-          <HabitsMini habits={habits} setHabits={setHabits} />
+          <HabitsMini habits={habits} setHabits={setHabits} habitDefs={habitDefs} />
         </section>
 
       </aside>

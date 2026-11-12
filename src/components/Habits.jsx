@@ -1,6 +1,5 @@
 import { Check, Star, Plus, Minus, Bell } from "lucide-react";
 import { dkey, pruneDays } from "../lib/dates.js";
-import { LS } from "../lib/storage.js";
 import { DEFAULT_HABIT_DEFS, isHabitDone, reqDone, optDone, getHabitIcon } from "../data/habits.js";
 
 export function HabitItem({ hb, bonus, code, value, on, onToggle, onAdjust }) {
@@ -88,7 +87,7 @@ export function HabitItem({ hb, bonus, code, value, on, onToggle, onAdjust }) {
 export function HabitsMini({ habits, setHabits, habitDefs }) {
   const today = dkey();
   const h = habits[today] || {};
-  const defs = habitDefs || LS.get("habitDefs") || DEFAULT_HABIT_DEFS;
+  const defs = habitDefs || DEFAULT_HABIT_DEFS;
   const reqDefs = defs.filter((d) => !d.archived && (!d.group || d.group === "req"));
   const optDefs = defs.filter((d) => !d.archived && d.group === "opt");
 

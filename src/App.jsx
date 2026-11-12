@@ -52,7 +52,7 @@ export default function App() {
 
   const today = dkey();
   const creatineDef = (habitDefs || DEFAULT_HABIT_DEFS).find((d) => d.id === CREATINE_ID);
-  const creatineTaken = isHabitDone(creatineDef, (habits[today] || {})[CREATINE_ID]);
+  const creatineTaken = !creatineDef || creatineDef.archived || isHabitDone(creatineDef, (habits[today] || {})[CREATINE_ID]);
   const rem = useCreatineReminder(creatineTaken);
   const takeCreatine = () => setHabits((all) => {
     const val = creatineDef && creatineDef.kind === "count" ? (creatineDef.target || 1) : true;
@@ -83,7 +83,7 @@ export default function App() {
           <SyncBadge />
         </header>
         <div className="mx-auto max-w-6xl">
-          {tab === "train" && <TrainView sets={sets} setSets={setSets} log={log} setLog={setLog} block={block} setBlock={setBlock} habits={habits} setHabits={setHabits} swaps={swaps} setSwaps={setSwaps} loads={loads} setLoads={setLoads} lastLoads={lastLoads} setLastLoads={setLastLoads} startTimer={startTimer} openWarmup={() => setWarmup(true)} wp={wp} />}
+          {tab === "train" && <TrainView sets={sets} setSets={setSets} log={log} setLog={setLog} block={block} setBlock={setBlock} habits={habits} setHabits={setHabits} habitDefs={habitDefs} swaps={swaps} setSwaps={setSwaps} loads={loads} setLoads={setLoads} lastLoads={lastLoads} setLastLoads={setLastLoads} startTimer={startTimer} openWarmup={() => setWarmup(true)} wp={wp} />}
           {tab === "fitbit" && <DashboardView health={health} setHealth={setHealth} log={log} />}
           {tab === "settings" && <SettingsView habitDefs={habitDefs} setHabitDefs={setHabitDefs} reminderCard={<ReminderCard rem={rem} taken={creatineTaken} />} />}
           {tab === "habits" && <HabitsView habits={habits} setHabits={setHabits} habitDefs={habitDefs} tomorrow={wp.info(dkey(addDays(new Date(), 1)))} tonight={wp.info(dkey())} />}

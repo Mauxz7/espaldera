@@ -4,7 +4,7 @@ import { Droplets, Pill, FlaskConical, PackageCheck, MonitorOff, BookOpen, Milk,
 export const DEFAULT_HABIT_DEFS = [
   { id: "o_creatine", label: "Tomar creatina todos los días.", group: "req", kind: "check", target: 1, unit: "", remindAt: "12:00" },
   { id: "o_prep", label: "Alistar la creatina del día siguiente.", group: "req", kind: "check", target: 1, unit: "", remindAt: null },
-  { id: "o_water", label: "Tomar 2 botellas de agua (2L en total).", group: "req", kind: "check", target: 1, unit: "", remindAt: null },
+  { id: "o_water", label: "Tomar 2 botellas de agua (2L en total).", group: "req", kind: "count", target: 2, unit: "botellas", remindAt: null },
   { id: "o_pills", label: "Tomar pastillas (magnesio, omega 3, vitamina C).", group: "req", kind: "check", target: 1, unit: "", remindAt: null },
   { id: "o_screens", label: "Dejar dispositivos electrónicos a las 10:30 p.m.", group: "req", kind: "check", target: 1, unit: "", remindAt: null },
   { id: "f_read", label: "Leer 15 min de libro personal.", group: "opt", kind: "check", target: 1, unit: "", remindAt: null },
