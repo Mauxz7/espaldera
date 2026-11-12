@@ -1,7 +1,8 @@
 import { Flame, AlarmClock } from "lucide-react";
-import { dkey, fromKey, addDays, DAYS, DAYS_LONG, clockAm } from "../lib/dates.js";
+import { dkey, fromKey, addDays, DAYS, DAYS_LONG, clockAm, fmtShort } from "../lib/dates.js";
 import { routineById } from "../data/program.js";
-import { DEFAULT_HABIT_DEFS, reqDone, optDone, isHabitDone } from "../data/habits.js";
+import { DEFAULT_HABIT_DEFS, reqDone, isHabitDone, getHabitIcon } from "../data/habits.js";
+import { computeAllHabitStats } from "../lib/habitStats.js";
 import { Chip } from "../components/ui.jsx";
 import { HabitsMini } from "../components/Habits.jsx";
 
@@ -51,6 +52,7 @@ export function HabitsView({ habits, setHabits, habitDefs, tomorrow, tonight }) 
   const defs = habitDefs || DEFAULT_HABIT_DEFS;
   const reqDefs = defs.filter((d) => !d.archived && (!d.group || d.group === "req"));
   const optDefs = defs.filter((d) => !d.archived && d.group === "opt");
+  const habitStats = computeAllHabitStats([...reqDefs, ...optDefs], habits);
   const last7 = Array.from({ length: 7 }, (_, i) => dkey(addDays(new Date(), i - 6)));
   let streak = 0;
   for (let i = 6; i >= 0; i--) {
@@ -108,6 +110,67 @@ export function HabitsView({ habits, setHabits, habitDefs, tomorrow, tonight }) 
           </ol>
         </section>
       </div>
+
+      <section className="rounded-2xl border border-line bg-surface p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="font-display text-lg font-semibold uppercase tracking-wide">Rachas y cumplimiento</h2>
+            <p className="text-xs text-muted">Últimos 30 días por hábito · de hace 29 días a hoy</p>
+          </div>
+          <div className="flex items-center gap-3 text-[11px] text-muted">
+            <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-good" />Obligatorio</span>
+            <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-cool" />Facultativo</span>
+          </div>
+        </div>
+        <div className="space-y-2.5">
+          {habitStats.map((hb) => {
+            const Icon = getHabitIcon(hb);
+            const isOpt = hb.group === "opt";
+            const barColor = isOpt ? "bg-cool" : "bg-good";
+            const streakTone = hb.currentStreak > 0 ? (isOpt ? "text-cool" : "text-good") : "text-muted";
+            return (
+              <div key={hb.id} className="rounded-xl border border-line bg-surface2 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-surface text-muted">
+                      <Icon size={13} />
+                    </span>
+                    <span className="font-mono text-[10px] text-muted">{hb.code}</span>
+                    <span className="min-w-0 flex-1 text-sm font-medium leading-snug">{hb.label}</span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2.5 font-mono text-xs tabular-nums">
+                    <span className={`inline-flex items-center gap-1 font-semibold ${streakTone}`} title="Racha actual">
+                      <Flame size={12} />{hb.currentStreak} {hb.currentStreak === 1 ? "día" : "días"}
+                    </span>
+                    <span className="text-muted" title="Mejor racha">
+                      máx {hb.bestStreak}d
+                    </span>
+                    <span className="rounded-md bg-surface px-1.5 py-0.5 text-[11px] font-semibold text-fg" title={`${hb.done30} de 30 días cumplidos`}>
+                      {hb.rate30}%
+                    </span>
+                  </div>
+                </div>
+                <div
+                  className="mt-2 grid grid-cols-[repeat(30,minmax(0,1fr))] gap-[2px]"
+                  role="img"
+                  aria-label={`Últimos 30 días de ${hb.label}: ${hb.done30} de 30 días cumplidos (${hb.rate30}%)`}
+                >
+                  {hb.days30.map((d, idx) => {
+                    const isToday = idx === hb.days30.length - 1;
+                    return (
+                      <span
+                        key={d.date}
+                        title={`${fmtShort(d.date)}: ${d.done ? "Cumplido" : "Pendiente"}`}
+                        className={`h-2.5 rounded-[2px] ${d.done ? barColor : "bg-surface"} ${isToday && !d.done ? "ring-1 ring-inset ring-muted/40" : ""}`}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="rounded-2xl border border-line bg-surface p-4">
         <h2 className="mb-3 font-display text-lg font-semibold uppercase tracking-wide">De las 10:00 p.m. a la espaldera</h2>

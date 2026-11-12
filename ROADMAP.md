@@ -20,7 +20,7 @@ Hoy los hábitos son una lista fija de casillas en `src/data/habits.js`.
 - **Archivos:** `data/habits.js`, `components/Habits.jsx`, `views/HabitsView.jsx`, `views/SettingsView.jsx`, `lib/storage.js` (solo `SYNC_KEYS`), `App.jsx`.
 - **Listo cuando:** los datos existentes se ven igual que antes; puedes crear «Comer una fruta» y un contador de agua; hay pruebas de la lógica de cumplimiento en `tests/`.
 
-### ⬜ H2 · Rachas y cumplimiento por hábito
+### ✅ H2 · Rachas y cumplimiento por hábito
 Depende de H1.
 - Función pura en `src/lib/habitStats.js`: racha actual, mejor racha y % de cumplimiento de 30 días por hábito. Con pruebas.
 - En la pestaña Hábitos: una fila por hábito con su racha y una tira de los últimos 30 días.
