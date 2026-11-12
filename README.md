@@ -8,12 +8,18 @@ Centro de entrenamiento y hábitos, como app web instalable (PWA) para iPhone, i
 
 ## Desarrollo
 
+Guía del proyecto en [AGENTS.md](AGENTS.md) y tareas en [ROADMAP.md](ROADMAP.md).
+
 ```bash
 npm install
+```
+
+```bash
+npm test
 ```
 
 ```bash
 npm run build
 ```
 
-`npm run build` genera `docs/`, que es lo que publica GitHub Pages. Cada publicación cambia la versión del service worker y los dispositivos se actualizan solos.
+Cada cambio en `main` se prueba, se compila y se publica solo con GitHub Actions; los dispositivos se actualizan al abrir la app.
