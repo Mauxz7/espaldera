@@ -40,8 +40,10 @@ test("dos dispositivos se mezclan y resuelven conflictos", async () => {
 
   await a.write("block", { week: 2 }, 400);
   await b.write("swaps", { x: 1 }, 500);
+  await a.write("runLevel", { level: 3, lastDone: "2026-10-01", history: [{ date: "2026-10-01", done: true }] }, 450);
   await b.sync(); await a.sync(); await b.sync(); // a tenía un sha viejo: debe releer y reintentar
   assert.deepEqual(await b.read("block"), { week: 2 });
+  assert.deepEqual(await b.read("runLevel"), { level: 3, lastDone: "2026-10-01", history: [{ date: "2026-10-01", done: true }] });
   assert.deepEqual(await a.read("swaps"), { x: 1 });
   assert.equal((await a.status()).state, "ok");
 });

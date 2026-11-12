@@ -1,3 +1,5 @@
+import { getRunLevel } from "./runPlan.js";
+
 export const EQ = {
   ladder: "Swedish ladder",
   bar: "Barra 40 kg",
@@ -8,6 +10,31 @@ export const EQ = {
   run: "Calle o pista",
   bike: "Bici estática",
 };
+
+export function day3Exercises(level = 1) {
+  const lvl = getRunLevel(level);
+  const walkLabel = lvl.walkMin === 1 ? "el minuto" : `los ${lvl.walkMin} min`;
+  return [
+    { id: "d3a", block: "A", name: "Activación de tobillo y cadera", eq: ["ladder", "bw"], sets: 2, reps: "8 / lado", rir: 4, tempo: "Controlado", rest: 0,
+      tips: ["Círculos de tobillo, 8 elevaciones de talón lentas y 8 balanceos de pierna agarrado a la espaldera.", "Termina con 8 puentes de glúteo: despiertan la cadera para que la rodilla no cargue de más.", "Nada de estiramientos largos antes de correr."] },
+    { id: "d3b", block: "B", name: "Caminata rápida de entrada", eq: ["run"], sets: 1, fixedSets: true, reps: `${lvl.warmupMin} min`, rir: 4, tempo: "Ritmo ágil", rest: 0,
+      tips: ["Paso largo y brazos activos: sube pulsaciones sin impacto.", "Si algo molesta aquí, hoy cambia el trote por la alternativa sin impacto."] },
+    { id: "d3c", block: "C", name: `Intervalos: trote ${lvl.runMin} min + caminata ${lvl.walkMin} min`, eq: ["run"], sets: lvl.reps, fixedSets: true, reps: `${lvl.runMin} min de trote`, rir: 3, tempo: "Conversacional", rest: lvl.walkMin * 60,
+      tips: [
+        lvl.note,
+        "Ritmo al que puedas hablar en frases completas: si jadeas, vas muy rápido.",
+        "Pasos cortos y silenciosos, cayendo debajo de la cadera: menos golpe en la rodilla.",
+        `Al marcar cada bloque arranca ${walkLabel} de caminata.`,
+        "Superficie pareja; dolor punzante en rodilla o tobillo = se termina el trote y sigues caminando.",
+      ] },
+    { id: "d3d", block: "D", name: "Caminata de vuelta a la calma", eq: ["run"], sets: 1, fixedSets: true, reps: `${lvl.cooldownMin} min`, rir: 4, tempo: "Suave", rest: 0,
+      tips: ["Baja el ritmo poco a poco y respira por la nariz.", "No te sientes de golpe al terminar."] },
+    { id: "d3e", block: "E", name: "Elevaciones de talón excéntricas en peldaño", eq: ["ladder"], sets: 3, reps: "10–12", rir: 2, tempo: "1-0-3-1", rest: 45,
+      tips: ["Sube con las dos piernas y baja en 3 s: es lo que más fortalece el tobillo y el tendón.", "Talones por debajo del peldaño al final de la bajada.", "Agárrate a la espaldera solo para el equilibrio."] },
+    { id: "d3f", block: "F", name: "Tibial contra la pared + equilibrio a una pierna", eq: ["bw"], sets: 2, reps: "12 + 30 s / pierna", rir: 3, tempo: "Controlado", rest: 30,
+      tips: ["Espalda en la pared, pies adelante: sube las puntas 12 veces (tibial anterior, protege la espinilla).", "Luego 30 s en una pierna con la rodilla apenas flexionada.", "Progresión del equilibrio: ojos cerrados."] },
+  ];
+}
 
 export const ROUTINES = [
   {
@@ -53,20 +80,7 @@ export const ROUTINES = [
   {
     id: "d3", short: "Día 3", name: "Running & Tobillos", minutes: 38, weekday: 3,
     focus: "Trote por intervalos a ritmo conversacional, con preparación y fuerza de tobillo para proteger rodillas y tobillos.",
-    exercises: [
-      { id: "d3a", block: "A", name: "Activación de tobillo y cadera", eq: ["ladder", "bw"], sets: 2, reps: "8 / lado", rir: 4, tempo: "Controlado", rest: 0,
-        tips: ["Círculos de tobillo, 8 elevaciones de talón lentas y 8 balanceos de pierna agarrado a la espaldera.", "Termina con 8 puentes de glúteo: despiertan la cadera para que la rodilla no cargue de más.", "Nada de estiramientos largos antes de correr."] },
-      { id: "d3b", block: "B", name: "Caminata rápida de entrada", eq: ["run"], sets: 1, reps: "4 min", rir: 4, tempo: "Ritmo ágil", rest: 0,
-        tips: ["Paso largo y brazos activos: sube pulsaciones sin impacto.", "Si algo molesta aquí, hoy cambia el trote por la alternativa sin impacto."] },
-      { id: "d3c", block: "C", name: "Intervalos: trote 3 min + caminata 1 min", eq: ["run"], sets: 5, reps: "3 min de trote", rir: 3, tempo: "Conversacional", rest: 60,
-        tips: ["Ritmo al que puedas hablar en frases completas: si jadeas, vas muy rápido.", "Pasos cortos y silenciosos, cayendo debajo de la cadera: menos golpe en la rodilla.", "Al marcar cada bloque arranca el minuto de caminata. Progresión: +1 bloque o +30 s de trote por semana solo si rodillas y tobillos van bien.", "Superficie pareja; dolor punzante en rodilla o tobillo = se termina el trote y sigues caminando."] },
-      { id: "d3d", block: "D", name: "Caminata de vuelta a la calma", eq: ["run"], sets: 1, reps: "4 min", rir: 4, tempo: "Suave", rest: 0,
-        tips: ["Baja el ritmo poco a poco y respira por la nariz.", "No te sientes de golpe al terminar."] },
-      { id: "d3e", block: "E", name: "Elevaciones de talón excéntricas en peldaño", eq: ["ladder"], sets: 3, reps: "10–12", rir: 2, tempo: "1-0-3-1", rest: 45,
-        tips: ["Sube con las dos piernas y baja en 3 s: es lo que más fortalece el tobillo y el tendón.", "Talones por debajo del peldaño al final de la bajada.", "Agárrate a la espaldera solo para el equilibrio."] },
-      { id: "d3f", block: "F", name: "Tibial contra la pared + equilibrio a una pierna", eq: ["bw"], sets: 2, reps: "12 + 30 s / pierna", rir: 3, tempo: "Controlado", rest: 30,
-        tips: ["Espalda en la pared, pies adelante: sube las puntas 12 veces (tibial anterior, protege la espinilla).", "Luego 30 s en una pierna con la rodilla apenas flexionada.", "Progresión del equilibrio: ojos cerrados."] },
-    ],
+    exercises: day3Exercises(1),
   },
   {
     id: "d4", short: "Día 4", name: "Full Body & Kettlebell Flow", minutes: 45, weekday: 5,
@@ -119,8 +133,15 @@ export const BLOCK_WEEKS = [
   { n: 4, label: "Descarga", note: "Una serie menos y RIR +2. Recupera antes del siguiente bloque.", rir: 2, sets: -1 },
 ];
 
-export const effSets = (ex, week) => Math.max(1, ex.sets + (BLOCK_WEEKS[week - 1]?.sets || 0));
+export const effSets = (ex, week) => (ex.fixedSets ? ex.sets : Math.max(1, ex.sets + (BLOCK_WEEKS[week - 1]?.sets || 0)));
 
 export const effRir = (ex, week) => Math.max(0, ex.rir + (BLOCK_WEEKS[week - 1]?.rir || 0));
 
-export const routineById = (id) => ROUTINES.find((r) => r.id === id) || ROUTINES[0];
+export const routineById = (id, runLevel) => {
+  const base = ROUTINES.find((r) => r.id === id) || ROUTINES[0];
+  if (base.id === "d3") {
+    const lvl = getRunLevel(runLevel ?? 1);
+    return { ...base, runPlan: lvl, exercises: day3Exercises(lvl.level) };
+  }
+  return base;
+};
