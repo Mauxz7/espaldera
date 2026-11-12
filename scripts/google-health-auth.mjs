@@ -71,6 +71,9 @@ async function main() {
   }).toString();
   console.log("\nSe abre Google en el navegador. Elige tu cuenta; si dice «Google no verificó esta app»,");
   console.log("toca «Avanzado» → «Ir a Espaldera», marca el permiso de actividad y toca «Continuar».");
+  console.log("\nSi el navegador no se abre solo, copia este enlace completo y pégalo en Chrome o Safari:\n");
+  console.log(auth.toString());
+  console.log("\nEsperando la respuesta de Google… (deja esta ventana abierta)");
   spawnSync("open", [auth.toString()]);
   const code = await codeP;
 
