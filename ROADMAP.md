@@ -11,7 +11,7 @@ Cada tarea indica los archivos que toca. **Dos tareas que tocan el mismo archivo
 
 ## Fase 2 · Hábitos y recordatorios
 
-### ⬜ H1 · Hábitos editables y medibles
+### ✅ H1 · Hábitos editables y medibles
 Hoy los hábitos son una lista fija de casillas en `src/data/habits.js`.
 - Nueva clave sincronizada `habitDefs`: lista de `{ id, label, group: "req" | "opt", kind: "check" | "count", target, unit, remindAt: "HH:MM" | null }`. Su valor inicial son los 7 hábitos actuales con sus mismos `id`, más «Comer una fruta» (opcional).
 - En Ajustes: agregar, editar, reordenar y archivar hábitos. Archivar no borra el historial.

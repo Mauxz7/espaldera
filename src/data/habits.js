@@ -1,24 +1,67 @@
-import { Droplets, Pill, FlaskConical, PackageCheck, MonitorOff, BookOpen, Milk } from "lucide-react";
+import { Droplets, Pill, FlaskConical, PackageCheck, MonitorOff, BookOpen, Milk, Apple, Check, Hash } from "lucide-react";
 
-// Hábitos Obligatorios: definen el 100 % del día. Hábitos Facultativos: bonus aparte.
-// `notion` es el nombre exacto de la columna en la base "Registro diario".
-export const HABITS_REQ = [
-  { id: "o_creatine", code: "O1", label: "Tomar creatina todos los días.", icon: FlaskConical, notion: "O1 · Tomar creatina" },
-  { id: "o_prep", code: "O2", label: "Alistar la creatina del día siguiente.", icon: PackageCheck, notion: "O2 · Alistar creatina de mañana" },
-  { id: "o_water", code: "O3", label: "Tomar 2 botellas de agua (2L en total).", icon: Droplets, notion: "O3 · 2 botellas de agua (2 L)" },
-  { id: "o_pills", code: "O4", label: "Tomar pastillas (magnesio, omega 3, vitamina C).", icon: Pill, notion: "O4 · Pastillas (Mg, Ω3, Vit C)" },
-  { id: "o_screens", code: "O5", label: "Dejar dispositivos electrónicos a las 10:30 p.m.", icon: MonitorOff, notion: "O5 · Pantallas off 10:30 p.m." },
+// Definiciones iniciales: 7 hábitos existentes con sus mismos IDs + «Comer una fruta» (opcional).
+export const DEFAULT_HABIT_DEFS = [
+  { id: "o_creatine", label: "Tomar creatina todos los días.", group: "req", kind: "check", target: 1, unit: "", remindAt: "12:00" },
+  { id: "o_prep", label: "Alistar la creatina del día siguiente.", group: "req", kind: "check", target: 1, unit: "", remindAt: null },
+  { id: "o_water", label: "Tomar 2 botellas de agua (2L en total).", group: "req", kind: "check", target: 1, unit: "", remindAt: null },
+  { id: "o_pills", label: "Tomar pastillas (magnesio, omega 3, vitamina C).", group: "req", kind: "check", target: 1, unit: "", remindAt: null },
+  { id: "o_screens", label: "Dejar dispositivos electrónicos a las 10:30 p.m.", group: "req", kind: "check", target: 1, unit: "", remindAt: null },
+  { id: "f_read", label: "Leer 15 min de libro personal.", group: "opt", kind: "check", target: 1, unit: "", remindAt: null },
+  { id: "f_shake", label: "Tomar batido de proteína.", group: "opt", kind: "check", target: 1, unit: "", remindAt: null },
+  { id: "f_fruit", label: "Comer una fruta.", group: "opt", kind: "check", target: 1, unit: "", remindAt: null },
 ];
 
-export const HABITS_OPT = [
-  { id: "f_read", code: "F1", label: "Leer 15 min de libro personal.", icon: BookOpen, notion: "F1 · Leer 15 min" },
-  { id: "f_shake", code: "F2", label: "Tomar batido de proteína.", icon: Milk, notion: "F2 · Batido de proteína" },
-];
+export const HABIT_ICONS = {
+  o_creatine: FlaskConical,
+  o_prep: PackageCheck,
+  o_water: Droplets,
+  o_pills: Pill,
+  o_screens: MonitorOff,
+  f_read: BookOpen,
+  f_shake: Milk,
+  f_fruit: Apple,
+};
 
-export const HABITS_ALL = [...HABITS_REQ, ...HABITS_OPT];
+export function getHabitIcon(hb) {
+  if (hb && hb.icon) return hb.icon;
+  if (hb && hb.id && HABIT_ICONS[hb.id]) return HABIT_ICONS[hb.id];
+  return hb && hb.kind === "count" ? Hash : Check;
+}
 
 export const CREATINE_ID = "o_creatine";
 
-export const reqDone = (h) => HABITS_REQ.filter((x) => h && h[x.id]).length;
+export function isHabitDone(def, val) {
+  if (val === true) return true;
+  if (val === false || val == null) return false;
+  if (def && def.kind === "count") {
+    const num = typeof val === "number" ? val : Number(val);
+    const target = def.target != null ? Number(def.target) : 1;
+    return !isNaN(num) && num >= target;
+  }
+  return Boolean(val);
+}
 
-export const optDone = (h) => HABITS_OPT.filter((x) => h && h[x.id]).length;
+export function reqDone(h, defs = DEFAULT_HABIT_DEFS) {
+  if (!h || !Array.isArray(defs)) return 0;
+  return defs.filter((d) => (!d.group || d.group === "req") && !d.archived && isHabitDone(d, h[d.id])).length;
+}
+
+export function optDone(h, defs = DEFAULT_HABIT_DEFS) {
+  if (!h || !Array.isArray(defs)) return 0;
+  return defs.filter((d) => d.group === "opt" && !d.archived && isHabitDone(d, h[d.id])).length;
+}
+
+export const HABITS_REQ = DEFAULT_HABIT_DEFS.filter((d) => d.group === "req").map((d, i) => ({
+  ...d,
+  code: `O${i + 1}`,
+  icon: HABIT_ICONS[d.id] || Check,
+}));
+
+export const HABITS_OPT = DEFAULT_HABIT_DEFS.filter((d) => d.group === "opt").map((d, i) => ({
+  ...d,
+  code: `F${i + 1}`,
+  icon: HABIT_ICONS[d.id] || Check,
+}));
+
+export const HABITS_ALL = [...HABITS_REQ, ...HABITS_OPT];

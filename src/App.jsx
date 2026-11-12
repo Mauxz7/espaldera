@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Dumbbell, Activity, Sunrise, Settings } from "lucide-react";
 import { Sync, usePersisted } from "./lib/storage.js";
 import { dkey, addDays, pruneDays } from "./lib/dates.js";
-import { CREATINE_ID } from "./data/habits.js";
+import { CREATINE_ID, DEFAULT_HABIT_DEFS, isHabitDone } from "./data/habits.js";
 import { useWeekPlan } from "./lib/planner.js";
 import { unlockAudio } from "./lib/audio.js";
 import { SyncBadge } from "./components/ui.jsx";
@@ -26,6 +26,7 @@ export default function App() {
   const [sets, setSets] = usePersisted("sets", {});
   const [log, setLog] = usePersisted("log", {});
   const [habits, setHabits] = usePersisted("habits", {});
+  const [habitDefs, setHabitDefs] = usePersisted("habitDefs", DEFAULT_HABIT_DEFS);
   const [health, setHealth] = usePersisted("health", []);
   const [block, setBlock] = usePersisted("block", { week: 1 });
   const [swaps, setSwaps] = usePersisted("swaps", {});
@@ -50,9 +51,13 @@ export default function App() {
   }, []);
 
   const today = dkey();
-  const creatineTaken = !!(habits[today] || {})[CREATINE_ID];
+  const creatineDef = (habitDefs || DEFAULT_HABIT_DEFS).find((d) => d.id === CREATINE_ID);
+  const creatineTaken = isHabitDone(creatineDef, (habits[today] || {})[CREATINE_ID]);
   const rem = useCreatineReminder(creatineTaken);
-  const takeCreatine = () => setHabits((all) => pruneDays({ ...all, [today]: { ...(all[today] || {}), [CREATINE_ID]: true } }, 60));
+  const takeCreatine = () => setHabits((all) => {
+    const val = creatineDef && creatineDef.kind === "count" ? (creatineDef.target || 1) : true;
+    return pruneDays({ ...all, [today]: { ...(all[today] || {}), [CREATINE_ID]: val } }, 60);
+  });
 
   return (
     <div className="min-h-full md:flex">
@@ -80,8 +85,8 @@ export default function App() {
         <div className="mx-auto max-w-6xl">
           {tab === "train" && <TrainView sets={sets} setSets={setSets} log={log} setLog={setLog} block={block} setBlock={setBlock} habits={habits} setHabits={setHabits} swaps={swaps} setSwaps={setSwaps} loads={loads} setLoads={setLoads} lastLoads={lastLoads} setLastLoads={setLastLoads} startTimer={startTimer} openWarmup={() => setWarmup(true)} wp={wp} />}
           {tab === "fitbit" && <DashboardView health={health} setHealth={setHealth} log={log} />}
-          {tab === "settings" && <SettingsView reminderCard={<ReminderCard rem={rem} taken={creatineTaken} />} />}
-          {tab === "habits" && <HabitsView habits={habits} setHabits={setHabits} tomorrow={wp.info(dkey(addDays(new Date(), 1)))} tonight={wp.info(dkey())} />}
+          {tab === "settings" && <SettingsView habitDefs={habitDefs} setHabitDefs={setHabitDefs} reminderCard={<ReminderCard rem={rem} taken={creatineTaken} />} />}
+          {tab === "habits" && <HabitsView habits={habits} setHabits={setHabits} habitDefs={habitDefs} tomorrow={wp.info(dkey(addDays(new Date(), 1)))} tonight={wp.info(dkey())} />}
         </div>
       </main>
 
