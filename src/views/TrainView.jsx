@@ -8,14 +8,12 @@ import { MAX_RUN_LEVEL, getRunLevel } from "../data/runPlan.js";
 import { ROUTINES, BLOCK_WEEKS, effSets, routineById } from "../data/program.js";
 import { altFor } from "../data/subs.js";
 import { ProgressBar } from "../components/ui.jsx";
-import { WeekCard } from "../components/WeekCard.jsx";
-import { HabitsMini } from "../components/Habits.jsx";
 import { SwapModal, ExerciseCard } from "../components/ExerciseCard.jsx";
 import { useFitbitShortcut, buildFitbitShortcutUrl } from "../components/FitbitShortcutCard.jsx";
 
-export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits, setHabits, habitDefs, swaps, setSwaps, loads, setLoads, lastLoads, setLastLoads, startTimer, openWarmup, wp }) {
+export function TrainView({ sets, setSets, log, setLog, block, swaps, setSwaps, loads, setLoads, lastLoads, setLastLoads, startTimer, openWarmup, wp, initialRid }) {
   const today = dkey();
-  const [rid, setRid] = useState(() => wp.arr[wp.todayIdx] || wp.nextRid || "d1");
+  const [rid, setRid] = useState(() => initialRid || log[dkey()]?.r || wp.arr[wp.todayIdx] || wp.nextRid || "d1");
   const [swapFor, setSwapFor] = useState(null);
   const [seriesLog, setSeriesLog] = usePersisted("setLog", {});
   const [runLevel, setRunLevel] = usePersisted("runLevel", DEFAULT_RUN_LEVEL);
@@ -202,13 +200,18 @@ export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits,
   };
 
   const bw = BLOCK_WEEKS[week - 1];
+  // La rutina elegida siempre queda a la vista en la tira de rutinas (en el teléfono se sale por la derecha).
+  useEffect(() => {
+    const el = document.querySelector('[data-routine-chip][aria-pressed="true"]');
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [rid]);
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+    <div>
       <div className="min-w-0 space-y-4">
         <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
           {ROUTINES.map((r) => (
-            <button key={r.id} onClick={() => setRid(r.id)} aria-pressed={r.id === rid}
+            <button key={r.id} data-routine-chip onClick={() => setRid(r.id)} aria-pressed={r.id === rid}
               className={`shrink-0 rounded-xl border px-3.5 py-2 text-left transition ${r.id === rid ? (r.low ? "border-cool bg-cool/15" : "border-accent bg-accent/15") : "border-line bg-surface hover:border-muted"}`}>
               <div className={`flex items-center gap-1 text-[11px] font-semibold uppercase tracking-widest ${r.id === rid ? (r.low ? "text-cool" : "text-accent") : "text-muted"}`}>{r.low && <BatteryLow size={12} />}{r.short}{log[today]?.r === r.id && <Check size={12} />}</div>
               <div className="whitespace-nowrap text-sm font-medium">{r.low ? "Baja energía · 20 min" : r.name}</div>
@@ -287,28 +290,6 @@ export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits,
         {swapEx && <SwapModal ex={swapEx} week={week} current={daySwaps[swapEx.id]} onPick={(altId) => { setSwap(swapEx.id, altId); setSwapFor(null); }} onClose={() => setSwapFor(null)} />}
       </div>
 
-      <aside className="grid min-w-0 content-start gap-4 md:grid-cols-2 xl:grid-cols-1">
-        <section className="rounded-2xl border border-line bg-surface p-4">
-          <h2 className="mb-2 font-display text-lg font-semibold uppercase tracking-wide">Bloque de 4 semanas</h2>
-          <div className="grid grid-cols-4 gap-1.5">
-            {BLOCK_WEEKS.map((b) => (
-              <button key={b.n} onClick={() => setBlock({ week: b.n })} aria-pressed={b.n === week} className={`rounded-lg border py-2 text-center transition ${b.n === week ? "border-accent bg-accent/15 text-accent" : "border-line bg-surface2 text-muted"}`}>
-                <div className="font-mono text-sm">S{b.n}</div>
-                <div className="text-[10px]">{b.label}</div>
-              </button>
-            ))}
-          </div>
-          <p className="mt-2 text-xs text-muted">{bw.note}</p>
-        </section>
-
-        <WeekCard wp={wp} log={log} />
-
-        <section className="rounded-2xl border border-line bg-surface p-4">
-          <h2 className="mb-2 font-display text-lg font-semibold uppercase tracking-wide">Hábitos de hoy</h2>
-          <HabitsMini habits={habits} setHabits={setHabits} habitDefs={habitDefs} />
-        </section>
-
-      </aside>
     </div>
   );
 }

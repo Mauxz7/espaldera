@@ -105,6 +105,21 @@ Hoy el usuario abre Fitbit, inicia el ejercicio y luego vuelve a Espaldera para 
 - **Archivos:** `views/TrainView.jsx`, componente nuevo en `components/`, `views/SettingsView.jsx`.
 - **Listo cuando:** se ve bien a 375 px de ancho.
 
+## Fase 6 · Interfaz
+
+### ✅ U1 · Pestaña Inicio · **Hecha por Claude**
+Cinco pestañas: Inicio (por defecto) · Entreno · Salud · Hábitos · Ajustes.
+- `views/HomeView.jsx`: tarjeta «Hoy» con una sola acción principal (rutina del día → «Empezar con Fitbit» / «Empezar»; descanso → sesión suave), anillos de la semana (sesiones de 4, días con hábitos obligatorios, minutos de Fitbit contra 150), «Mi semana», bloque de 4 semanas (`components/BlockCard.jsx`) y hábitos de hoy.
+- `lib/home.js` (`weekProgress`, `todayPlan`) con pruebas. Entreno queda solo con la rutina; recibe `initialRid` desde Inicio.
+- La app abre en Inicio, salvo que se haya cerrado a mitad de un entreno hace menos de 2 horas.
+
+### ⬜ U2 · Modo entreno y resumen al terminar
+Depende de U1. Toca `views/TrainView.jsx`, `components/ExerciseCard.jsx` y componentes nuevos; nada más en paralelo con esos archivos.
+- **Modo entreno** (como Strong o Hevy): un botón en el encabezado de la rutina abre una vista a pantalla completa con un ejercicio a la vez: nombre, serie actual (p. ej. «Serie 2 de 4»), reps, carga y RIR sugeridos (`lib/progression.js`), un botón grande «Serie hecha» que registra la serie igual que hoy (`setLog`) y arranca el descanso, y «Siguiente ejercicio». Cerrar vuelve a la lista sin perder nada.
+- **Resumen al terminar** (como Hevy o Fitbod): al completar todas las series, o al tocar «Terminar», una hoja con duración, series hechas, carga total levantada (reps × carga) y marcas nuevas frente a la última vez (`getLastExerciseLog`). Botón «Registrar sesión» que hace lo mismo que «Ya la hice».
+- Botones de al menos 48 px de alto, legibles con el teléfono en la mano. Funciones de cálculo puras en `lib/` con pruebas.
+- **Listo cuando:** se ve bien a 375 px, nada del registro actual cambia de forma y `npm test` pasa.
+
 ## Qué se puede hacer en paralelo ahora
 
 - **N1, N2 y N3** no comparten archivos: van en paralelo.
