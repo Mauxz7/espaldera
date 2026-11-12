@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Check, Zap, BatteryLow, Trophy } from "lucide-react";
 import { dkey, pruneDays } from "../lib/dates.js";
+import { usePersisted } from "../lib/storage.js";
+import { getLastExerciseLog, resolveDefaultSet, recordSet, removeSet, updateExerciseLoad } from "../lib/setLog.js";
 import { ROUTINES, BLOCK_WEEKS, effSets, routineById } from "../data/program.js";
 import { altFor } from "../data/subs.js";
 import { ProgressBar } from "../components/ui.jsx";
@@ -12,11 +14,13 @@ export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits,
   const today = dkey();
   const [rid, setRid] = useState(() => wp.arr[wp.todayIdx] || wp.nextRid || "d1");
   const [swapFor, setSwapFor] = useState(null);
+  const [seriesLog, setSeriesLog] = usePersisted("setLog", {});
   const routine = routineById(rid);
   const week = block.week || 1;
   const daySets = (sets[today] || {})[rid] || {};
   const daySwaps = (swaps[today] || {})[rid] || {};
   const dayLoads = (loads[today] || {})[rid] || {};
+  const daySetLog = (seriesLog[today] || {})[rid] || {};
 
   const setSwap = (exId, altId) => setSwaps((all) => {
     const day = { ...(all[today] || {}) };
@@ -27,7 +31,14 @@ export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits,
   });
   // Última carga usada en un día anterior, por ejercicio (o por su sustituto si hay uno activo).
   const loadKey = (exId) => (daySwaps[exId] ? `${exId}:${daySwaps[exId]}` : exId);
-  const lastFor = (exId) => { const l = (lastLoads || {})[loadKey(exId)]; return l && l.d !== today ? l : (l && l.prev) || null; };
+  const lastFor = (exId) => {
+    const hist = getLastExerciseLog(seriesLog, exId, today, rid);
+    if (hist && (hist.load || hist.repsSummary)) {
+      return { d: hist.date, v: hist.load, reps: hist.repsSummary, series: hist.series };
+    }
+    const l = (lastLoads || {})[loadKey(exId)];
+    return l && l.d !== today ? l : (l && l.prev) || null;
+  };
   const rememberLoad = (exId, v) => setLastLoads((all) => {
     const k = loadKey(exId);
     const cur = (all || {})[k];
@@ -36,7 +47,18 @@ export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits,
     if (v) next[k] = { v, d: today, prev }; else if (prev) next[k] = prev; else delete next[k];
     return next;
   });
-  const setLoad = (exId, v) => { rememberLoad(exId, v); setLoadRaw(exId, v); };
+  const setLoad = (exId, v) => {
+    rememberLoad(exId, v);
+    setLoadRaw(exId, v);
+    setSeriesLog((all) => updateExerciseLoad({
+      setLog: all,
+      date: today,
+      routineId: rid,
+      exerciseId: exId,
+      load: v,
+      maxDays: 90,
+    }));
+  };
   const setLoadRaw = (exId, v) => setLoads((all) => {
     const day = { ...(all[today] || {}) };
     const r = { ...(day[rid] || {}) };
@@ -47,7 +69,16 @@ export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits,
   const swapEx = swapFor ? routine.exercises.find((e) => e.id === swapFor) : null;
 
   const total = routine.exercises.reduce((a, ex) => a + effSets(ex, week), 0);
-  const done = routine.exercises.reduce((a, ex) => a + (daySets[ex.id] || []).slice(0, effSets(ex, week)).filter(Boolean).length, 0);
+  const done = routine.exercises.reduce((a, ex) => {
+    const n = effSets(ex, week);
+    const s = daySetLog[ex.id] || [];
+    const ds = daySets[ex.id] || [];
+    let count = 0;
+    for (let i = 0; i < n; i++) {
+      if (s[i] || ds[i]) count++;
+    }
+    return a + count;
+  }, 0);
   const progress = total ? done / total : 0;
   const logged = log[today];
 
@@ -56,13 +87,93 @@ export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits,
   }, [progress, logged, rid, today, setLog]);
 
   const toggle = (ex, i, n) => {
-    const was = !!(daySets[ex.id] || [])[i];
+    const exSeries = daySetLog[ex.id] || [];
+    const was = !!exSeries[i] || !!(daySets[ex.id] || [])[i];
+
+    if (was) {
+      setSeriesLog((all) => removeSet({
+        setLog: all,
+        date: today,
+        routineId: rid,
+        exerciseId: ex.id,
+        setIndex: i,
+        maxDays: 90,
+      }));
+      setSets((all) => {
+        const day = { ...(all[today] || {}) };
+        const r = { ...(day[rid] || {}) };
+        const arr = Array.from({ length: n }, (_, k) => !!(r[ex.id] || [])[k]);
+        arr[i] = false;
+        r[ex.id] = arr;
+        day[rid] = r;
+        const next = { ...all, [today]: day };
+        const keep = Object.keys(next).sort().slice(-21);
+        return Object.fromEntries(keep.map((k) => [k, next[k]]));
+      });
+    } else {
+      const lastSession = getLastExerciseLog(seriesLog, ex.id, today, rid);
+      const resolved = resolveDefaultSet({
+        series: exSeries,
+        setIndex: i,
+        exReps: ex.reps,
+        currentLoad: dayLoads[ex.id] || (exSeries.slice().reverse().find((s) => s && s.load)?.load) || "",
+        lastLog: lastSession,
+      });
+      setSeriesLog((all) => recordSet({
+        setLog: all,
+        date: today,
+        routineId: rid,
+        exerciseId: ex.id,
+        setIndex: i,
+        reps: resolved.reps,
+        load: resolved.load,
+        maxDays: 90,
+      }));
+      if (resolved.load && !dayLoads[ex.id]) {
+        rememberLoad(ex.id, resolved.load);
+        setLoadRaw(ex.id, resolved.load);
+      }
+      setSets((all) => {
+        const day = { ...(all[today] || {}) };
+        const r = { ...(day[rid] || {}) };
+        const arr = Array.from({ length: n }, (_, k) => !!(r[ex.id] || [])[k]);
+        arr[i] = true;
+        r[ex.id] = arr;
+        day[rid] = r;
+        const next = { ...all, [today]: day };
+        const keep = Object.keys(next).sort().slice(-21);
+        return Object.fromEntries(keep.map((k) => [k, next[k]]));
+      });
+      if (ex.rest) startTimer(ex.rest);
+      if (ex.emom) startTimer(60);
+    }
+  };
+
+  const saveSet = (ex, i, reps, load, n) => {
+    const exSeries = daySetLog[ex.id] || [];
+    const was = !!exSeries[i] || !!(daySets[ex.id] || [])[i];
+
+    setSeriesLog((all) => recordSet({
+      setLog: all,
+      date: today,
+      routineId: rid,
+      exerciseId: ex.id,
+      setIndex: i,
+      reps,
+      load,
+      maxDays: 90,
+    }));
+    if (load) {
+      rememberLoad(ex.id, load);
+      setLoadRaw(ex.id, load);
+    }
     setSets((all) => {
       const day = { ...(all[today] || {}) };
       const r = { ...(day[rid] || {}) };
       const arr = Array.from({ length: n }, (_, k) => !!(r[ex.id] || [])[k]);
-      arr[i] = !arr[i];
-      r[ex.id] = arr; day[rid] = r;
+      arr[i] = true;
+      r[ex.id] = arr;
+      day[rid] = r;
       const next = { ...all, [today]: day };
       const keep = Object.keys(next).sort().slice(-21);
       return Object.fromEntries(keep.map((k) => [k, next[k]]));
@@ -112,10 +223,31 @@ export function TrainView({ sets, setSets, log, setLog, block, setBlock, habits,
         </section>
 
         <div className="grid gap-3 2xl:grid-cols-2">
-          {routine.exercises.map((ex) => (
-            <ExerciseCard key={ex.id + week} ex={ex} alt={altFor(ex.id, daySwaps[ex.id])} week={week} done={daySets[ex.id] || []} onToggle={(i, n) => toggle(ex, i, n)}
-              onSwap={() => setSwapFor(ex.id)} onRevert={() => setSwap(ex.id, null)} load={dayLoads[ex.id]} onLoad={(v) => setLoad(ex.id, v)} last={lastFor(ex.id)} />
-          ))}
+          {routine.exercises.map((ex) => {
+            const n = effSets(ex, week);
+            const exSeries = daySetLog[ex.id] || [];
+            const exDaySets = daySets[ex.id] || [];
+            const doneArr = Array.from({ length: n }, (_, i) => !!exSeries[i] || !!exDaySets[i]);
+            const currentLoad = dayLoads[ex.id] || (exSeries.slice().reverse().find((s) => s && s.load)?.load) || "";
+
+            return (
+              <ExerciseCard
+                key={ex.id + week}
+                ex={ex}
+                alt={altFor(ex.id, daySwaps[ex.id])}
+                week={week}
+                done={doneArr}
+                series={exSeries}
+                onToggle={(i, count) => toggle(ex, i, count)}
+                onSaveSet={(i, reps, load, count) => saveSet(ex, i, reps, load, count)}
+                onSwap={() => setSwapFor(ex.id)}
+                onRevert={() => setSwap(ex.id, null)}
+                load={currentLoad}
+                onLoad={(v) => setLoad(ex.id, v)}
+                last={lastFor(ex.id)}
+              />
+            );
+          })}
         </div>
         {swapEx && <SwapModal ex={swapEx} week={week} current={daySwaps[swapEx.id]} onPick={(altId) => { setSwap(swapEx.id, altId); setSwapFor(null); }} onClose={() => setSwapFor(null)} />}
       </div>

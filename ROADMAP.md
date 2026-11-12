@@ -38,7 +38,7 @@ Depende de H1. **Reservada para Claude** (toca el repositorio privado y la sincr
 
 ## Fase 3 · Entrenamiento
 
-### ⬜ E1 · Registro de repeticiones y carga por serie
+### ✅ E1 · Registro de repeticiones y carga por serie
 Hoy cada serie es una casilla y hay un único campo «Carga» por ejercicio.
 - Nueva clave sincronizada `setLog`: `{ [fecha]: { [rutina]: { [ejercicio]: [{ reps, load }] } } }`, recortada a 90 días.
 - Al tocar una serie se marca como hoy; un toque largo (o un botón «editar») abre un control compacto para ajustar repeticiones y carga, precargado con lo de la serie anterior.
