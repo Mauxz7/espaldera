@@ -16,9 +16,9 @@ export const KEEP_DAYS = 400;
 export function classify(type) {
   const t = String(type || "").toLowerCase();
   if (/run|corr|carrera|trote/.test(t)) return "run";
-  if (/cycl|bici|ciclis|spinning/.test(t)) return "bike";
+  if (/cycl|bici|ciclis|spinning|ride/.test(t)) return "bike";
   if (/walk|camin|hik|senderis/.test(t)) return "walk";
-  if (/strength|fuerza|funcional|functional|hiit|core|cross|calisten|pesas|weight/.test(t)) return "strength";
+  if (/strength|fuerza|funcional|functional|hiit|highintensity|core|cross|calisten|pesas|weight/.test(t)) return "strength";
   return "other";
 }
 
@@ -76,10 +76,9 @@ export function mergeWorkouts(current, incoming, now = new Date()) {
   return { list, added };
 }
 
-export function main({ root = process.cwd(), now = new Date() } = {}) {
-  const inbox = path.join(root, "health", "inbox");
-  const files = fs.existsSync(inbox) ? fs.readdirSync(inbox).filter((f) => !f.startsWith(".")) : [];
-  const incoming = files.flatMap((f) => parseInbox(fs.readFileSync(path.join(inbox, f), "utf8")));
+// Fusiona entrenos nuevos en health/workouts.json (copia maestra) y en la clave «workouts» de data.json.
+// La usan este receptor y el de Strava (scripts/strava.mjs).
+export function applyWorkouts({ root = process.cwd(), incoming = [], now = new Date() } = {}) {
   const dataPath = path.join(root, "data.json");
   const data = fs.existsSync(dataPath) ? JSON.parse(fs.readFileSync(dataPath, "utf8")) : {};
   // health/workouts.json es la copia maestra: si un dispositivo con una versión vieja de la app
@@ -96,6 +95,14 @@ export function main({ root = process.cwd(), now = new Date() } = {}) {
     data.workouts = { v: list, at: now.getTime() };
     fs.writeFileSync(dataPath, JSON.stringify(data));
   }
+  return { list, added, repaired };
+}
+
+export function main({ root = process.cwd(), now = new Date() } = {}) {
+  const inbox = path.join(root, "health", "inbox");
+  const files = fs.existsSync(inbox) ? fs.readdirSync(inbox).filter((f) => !f.startsWith(".")) : [];
+  const incoming = files.flatMap((f) => parseInbox(fs.readFileSync(path.join(inbox, f), "utf8")));
+  const { list, added, repaired } = applyWorkouts({ root, incoming, now });
   for (const f of files) fs.unlinkSync(path.join(inbox, f));
   // Solo conteos en el registro.
   console.log(`archivos: ${files.length} · líneas válidas: ${incoming.length} · nuevos: ${added} · total: ${list.length}${repaired && !added ? " · data.json reparado" : ""}`);

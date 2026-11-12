@@ -4,21 +4,20 @@ import { fmtShort, dkey } from "../lib/dates.js";
 
 const KIND = { run: "Running", bike: "Bici", walk: "Caminata", strength: "Fuerza", other: "Otro" };
 
-// Guía para armar el Atajo del iPhone que manda los entrenos de Apple Health (tarea S1).
-// Google Health / Fitbit escribe los entrenos en Apple Health; el Atajo los lee y los deja
-// en la bandeja del repositorio privado, donde una tarea de GitHub los pasa a la clave «workouts».
+// Entrenos de Fitbit (tareas S1 y S3). Camino: Fitbit → app Google Health → conexión oficial con Strava
+// (sube cada entreno nuevo) → tarea «Strava» del repositorio privado → clave «workouts».
+// (Atajos de iOS no puede leer entrenamientos de Apple Health: «Buscar muestras de salud» no trae ese tipo.)
 export function HealthIntakeCard() {
   const [workouts] = usePersisted("workouts", []);
   const list = Array.isArray(workouts) ? workouts : [];
   const last = list[0];
   const repo = (LS.get("@gh") || {}).repo || DEFAULT_REPO;
-  const url = `https://api.github.com/repos/${repo}/contents/health/inbox/`;
 
   return (
     <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">
-      <h2 className="mb-1 font-display text-lg font-semibold uppercase tracking-wide">Entrenos de Apple Health</h2>
+      <h2 className="mb-1 font-display text-lg font-semibold uppercase tracking-wide">Entrenos de Fitbit</h2>
       <p className="text-sm text-muted">
-        Fitbit/Google Health guarda tus entrenos en Apple Health. Un Atajo del iPhone los envía a tu repositorio privado y aparecen aquí en todos tus dispositivos.
+        Google Health manda cada entreno de tu Fitbit a Strava, y una tarea de tu repositorio privado los trae aquí cuatro veces al día, en todos tus dispositivos. No necesitas usar Strava: solo sirve de puente.
       </p>
       <div className="mt-3 flex items-start gap-2 text-xs">
         <HeartPulse size={14} className={`mt-0.5 shrink-0 ${list.length ? "text-good" : "text-muted"}`} />
@@ -28,45 +27,28 @@ export function HealthIntakeCard() {
             {last.min ? ` (${last.min} min)` : ""}
           </span>
         ) : (
-          <span className="text-muted">Aún no llega ningún entreno. Arma el Atajo con la guía de abajo.</span>
+          <span className="text-muted">Aún no llega ningún entreno. Conecta Strava con la guía de abajo.</span>
         )}
       </div>
 
       <details className="group mt-3 rounded-xl bg-surface2 p-3 text-xs text-muted">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-2 font-semibold text-fg">
-          Cómo armar el Atajo (una vez, en el iPhone)
+          Cómo conectarlo (una vez)
           <ChevronDown size={15} className="shrink-0 transition group-open:rotate-180" />
         </summary>
         <ol className="mt-2 list-decimal space-y-2 pl-4 leading-relaxed">
-          <li>Abre <b className="text-fg">Atajos</b> → <b className="text-fg">+</b> y llámalo «Enviar entrenos a Espaldera».</li>
           <li>
-            Agrega <b className="text-fg">Buscar muestras de salud</b>: tipo <b className="text-fg">Entrenamientos</b>, filtro «Fecha de inicio está en los últimos 7 días», ordenar por fecha de inicio, límite 50.
+            En la app <b className="text-fg">Google Health</b> del iPhone: ícono de <b className="text-fg">Conexiones</b> → <b className="text-fg">Strava</b> → sigue los pasos y deja activados los tipos de entreno que haces. Solo se suben los entrenos nuevos.
           </li>
           <li>
-            Agrega <b className="text-fg">Repetir con cada</b> elemento. Dentro, una acción <b className="text-fg">Texto</b> con esta línea (toca «Elemento repetido» para elegir cada dato):
-            <code className="mt-1 block break-words rounded-lg bg-surface p-2 font-mono text-[11px] text-fg">Tipo | Fecha de inicio | Fecha de finalización | Duración</code>
-            En las dos fechas elige formato <b className="text-fg">ISO 8601</b> con hora. Deja las barras «|» tal cual.
-          </li>
-          <li>Después del bloque, agrega <b className="text-fg">Combinar texto</b> con «Nueva línea».</li>
-          <li>Agrega <b className="text-fg">Codificar en Base64</b> (saltos de línea: Ninguno).</li>
-          <li>
-            Agrega <b className="text-fg">Fecha actual</b> y <b className="text-fg">Formatear fecha</b> con formato personalizado <code className="font-mono text-fg">yyyyMMdd-HHmmss</code>.
+            En la compu, abre <code className="break-all font-mono text-fg">strava.com/settings/api</code> y crea una app: nombre «Espaldera», sitio <code className="font-mono text-fg">https://mauxz7.github.io/espaldera/</code> y <b className="text-fg">Authorization Callback Domain</b> = <code className="font-mono text-fg">localhost</code>.
           </li>
           <li>
-            Agrega <b className="text-fg">Obtener contenido de URL</b>:
-            <ul className="mt-1 list-disc space-y-1 pl-4">
-              <li>URL: <code className="break-all font-mono text-fg">{url}</code> + la fecha formateada + <code className="font-mono text-fg">.txt</code></li>
-              <li>Método: <b className="text-fg">PUT</b></li>
-              <li>Encabezados: <code className="font-mono text-fg">Authorization</code> = <code className="font-mono text-fg">Bearer</code> + tu clave de GitHub (la misma que pegaste en Ajustes), y <code className="font-mono text-fg">Accept</code> = <code className="font-mono text-fg">application/vnd.github+json</code></li>
-              <li>Cuerpo JSON: <code className="font-mono text-fg">message</code> = «entrenos» y <code className="font-mono text-fg">content</code> = el texto en Base64.</li>
-            </ul>
+            En la terminal, dentro de la carpeta del proyecto, corre <code className="font-mono text-fg">node scripts/strava-auth.mjs</code>. Pega el Client ID y el Client Secret y toca «Autorizar» en Strava. Los secretos se guardan solos en <code className="break-all font-mono text-fg">{repo}</code>.
           </li>
-          <li>Pruébalo una vez con ▶. En un minuto los entrenos aparecen aquí.</li>
-          <li>
-            Para que sea automático: <b className="text-fg">Automatización</b> → <b className="text-fg">+</b> → «Hora del día», 9:30 p.m., diario, <b className="text-fg">Ejecutar inmediatamente</b>, y elige este atajo.
-          </li>
+          <li>Haz un entreno con el Fitbit (o espera al próximo). Aparece aquí en unas horas, o al instante si lanzas la tarea «Strava» a mano en GitHub → Actions.</li>
         </ol>
-        <p className="mt-2">Mandar la misma semana dos veces no duplica nada. Tu clave queda solo dentro del Atajo en tu iPhone.</p>
+        <p className="mt-2">Un mismo entreno nunca se duplica. Tus claves quedan solo en los secretos de tu repositorio privado.</p>
       </details>
     </section>
   );

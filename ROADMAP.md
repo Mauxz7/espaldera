@@ -67,9 +67,16 @@ Hoy el día de running tiene intervalos fijos (5 × 3 min de trote + 1 min de ca
 Formato y canal para que un Atajo del iPhone envíe los entrenos de Apple Health al repositorio privado.
 - Hecho: el Atajo crea `health/inbox/<marca>.txt` (una línea por entreno: `tipo | inicio | fin | duración`); el workflow «Entrenos» del repo privado corre `scripts/entrenos.mjs` (copia de la de este repo, con pruebas) y deja la lista en la clave sincronizada `workouts` (`[{ id, type, kind: run|bike|walk|strength|other, start, end, min }]`, del más reciente al más viejo). La guía del Atajo está en Ajustes (`components/HealthIntakeCard.jsx`).
 - Para S2: leer `usePersisted("workouts", [])`; no escribir esa clave desde la app.
+- Límite descubierto: en iOS, Atajos no puede leer entrenamientos («Buscar muestras de salud» no tiene ese tipo). La bandeja sigue funcionando para otros envíos, pero los entrenos de Fitbit llegan por S3.
 
 ### ✅ S2 · Vista de entrenos
 Depende de S1. Lista y resumen semanal de entrenos (Fitbit y Strava) en la pestaña Salud.
+
+### ✅ S3 · Entrenos de Fitbit vía Strava · **Reservada para Claude**
+Fitbit → app Google Health → conexión oficial con Strava (sube cada entreno nuevo, con o sin GPS) → workflow «Strava» del repo privado (4 veces al día) → clave `workouts`.
+- `scripts/strava.mjs` (copia en el repo privado junto con `scripts/entrenos.mjs`, que ahora exporta `applyWorkouts`). Entrenos con `source: "strava"` y `km` opcional; mismo `id` que el Atajo, así nada se duplica.
+- Autorización una sola vez con `node scripts/strava-auth.mjs` (guarda los secretos `STRAVA_*` con `gh secret set`). Si Strava rota el token, se guarda cifrado en `strava/token.enc` del repo privado.
+- La API vieja de Fitbit se apagó en noviembre de 2026 y la Google Health API exige revisión de Google; por eso el puente es Strava.
 
 ## Qué se puede hacer en paralelo ahora
 
