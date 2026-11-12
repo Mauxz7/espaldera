@@ -74,7 +74,9 @@ async function main() {
   console.log("\nSi el navegador no se abre solo, copia este enlace completo y pégalo en Chrome o Safari:\n");
   console.log(auth.toString());
   console.log("\nEsperando la respuesta de Google… (deja esta ventana abierta)");
-  spawnSync("open", [auth.toString()]);
+  // Navegador: ESPALDERA_BROWSER (p. ej. "Safari"); si no, el predeterminado del sistema.
+  const browser = process.env.ESPALDERA_BROWSER;
+  spawnSync("open", browser ? ["-a", browser, auth.toString()] : [auth.toString()]);
   const code = await codeP;
 
   const res = await fetch("https://oauth2.googleapis.com/token", {
