@@ -34,7 +34,9 @@ export function normalizeRunLevel(state, maxLevel = MAX_RUN_LEVEL) {
   const history = Array.isArray(state.history)
     ? state.history
         .filter((h) => h && typeof h.date === "string")
-        .map((h) => ({ date: h.date, done: Boolean(h.done) }))
+        .map((h) => (Number.isFinite(h.level)
+          ? { date: h.date, done: Boolean(h.done), level: h.level }
+          : { date: h.date, done: Boolean(h.done) }))
     : [];
   let lastDone = typeof state.lastDone === "string" && state.lastDone ? state.lastDone : null;
   if (!lastDone && history.length > 0) {
@@ -143,7 +145,8 @@ export function recordRunSession(state, sessionOrDate, doneArg = true, maxLevel 
   if (done) {
     const nextLevel = clampRunLevel(baseLevel + 1, max);
     const filtered = norm.history.filter((h) => h.date !== date);
-    const history = [...filtered, { date, done: true }].slice(-MAX_HISTORY);
+    // Guarda el nivel que se corrió ese día para seguir mostrándolo hasta mañana.
+    const history = [...filtered, { date, done: true, level: baseLevel }].slice(-MAX_HISTORY);
     const lastDone = !norm.lastDone || date >= norm.lastDone ? date : norm.lastDone;
     return {
       level: nextLevel,
@@ -161,6 +164,36 @@ export function recordRunSession(state, sessionOrDate, doneArg = true, maxLevel 
   return {
     level: baseLevel,
     lastDone: norm.lastDone,
+    history,
+  };
+}
+
+/**
+ * Nivel que se muestra en `date`: si ese día ya se completó una sesión, el nivel que se corrió
+ * (el avance aplica desde la próxima sesión); si no, el nivel efectivo con el retroceso aplicado.
+ */
+export function getDisplayRunLevel(state, date, maxLevel = MAX_RUN_LEVEL) {
+  const norm = normalizeRunLevel(state, maxLevel);
+  const doneToday = norm.history.find((h) => h.date === date && h.done);
+  if (doneToday) {
+    return clampRunLevel(Number.isFinite(doneToday.level) ? doneToday.level : norm.level - 1, maxLevel);
+  }
+  return getEffectiveRunLevel(norm, date, maxLevel);
+}
+
+/**
+ * Deshace la sesión completada en `date` (al tocar «Quitar registro»): vuelve al nivel
+ * que se corrió ese día y recalcula `lastDone` con la sesión completada anterior.
+ */
+export function undoRunSession(state, date, maxLevel = MAX_RUN_LEVEL) {
+  const norm = normalizeRunLevel(state, maxLevel);
+  const entry = norm.history.find((h) => h.date === date && h.done);
+  if (!entry) return norm;
+  const history = norm.history.filter((h) => h.date !== date);
+  const prevDone = [...history].filter((h) => h.done).sort((a, b) => a.date.localeCompare(b.date)).pop();
+  return {
+    level: clampRunLevel(Number.isFinite(entry.level) ? entry.level : norm.level - 1, maxLevel),
+    lastDone: prevDone ? prevDone.date : null,
     history,
   };
 }

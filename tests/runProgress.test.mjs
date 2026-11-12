@@ -37,7 +37,7 @@ test("avanza un nivel al completar la sesión de running y no avanza dos veces e
   state = recordRunSession(state, { date: "2026-10-01", done: true });
   assert.equal(state.level, 2);
   assert.equal(state.lastDone, "2026-10-01");
-  assert.deepEqual(state.history, [{ date: "2026-10-01", done: true }]);
+  assert.deepEqual(state.history, [{ date: "2026-10-01", done: true, level: 1 }]);
 
   // Intentar registrar otra vez el mismo día no vuelve a subir de nivel
   const duplicate = recordRunSession(state, { date: "2026-10-01", done: true });
@@ -127,4 +127,23 @@ test("Día 3 toma series y tiempos del nivel actual sin cambiar tobillos, talone
       d3Lvl3.exercises.find((e) => e.id === id),
     );
   }
+});
+
+test("getDisplayRunLevel mantiene el nivel corrido el mismo día y muestra el nuevo al día siguiente", async () => {
+  const { getDisplayRunLevel, recordRunSession } = await import("../src/lib/runProgress.js");
+  const after = recordRunSession({ level: 3, lastDone: null, history: [] }, { date: "2026-11-14", done: true });
+  assert.equal(after.level, 4);
+  assert.equal(getDisplayRunLevel(after, "2026-11-14"), 3);
+  assert.equal(getDisplayRunLevel(after, "2026-11-21"), 4);
+});
+
+test("undoRunSession revierte el avance al quitar el registro del día", async () => {
+  const { undoRunSession, recordRunSession } = await import("../src/lib/runProgress.js");
+  const before = recordRunSession({ level: 2, lastDone: null, history: [] }, { date: "2026-11-07", done: true });
+  const after = recordRunSession(before, { date: "2026-11-14", done: true });
+  assert.equal(after.level, 4);
+  const undone = undoRunSession(after, "2026-11-14");
+  assert.equal(undone.level, 3);
+  assert.equal(undone.lastDone, "2026-11-07");
+  assert.equal(undone.history.length, 1);
 });
