@@ -32,9 +32,10 @@ Depende de H1.
 - Un solo aviso en pantalla que liste los pendientes, cada uno con su botón de marcar.
 - **Archivos:** `lib/reminder.jsx`, `App.jsx`.
 
-### ⬜ H4 · Notificaciones con la app cerrada
+### ✅ H4 · Notificaciones con la app cerrada
 Depende de H1. **Reservada para Claude** (toca el repositorio privado y la sincronización).
 - Web Push para la app instalada, enviada por una tarea programada de GitHub Actions en el repositorio privado, que lee los hábitos pendientes y avisa solo de esos.
+- Hecho: `src/lib/push.js` + `components/PushCard.jsx` (suscripción por dispositivo en `push/subs/` del repo privado), avisos en `public/sw.js`, remitente `scripts/recordatorios.mjs` (con pruebas). **El remitente corre como copia en el repo privado**: si cambias `scripts/recordatorios.mjs`, cópialo también allá.
 
 ## Fase 3 · Entrenamiento
 
