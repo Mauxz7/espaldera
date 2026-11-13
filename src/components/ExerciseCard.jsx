@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { X, Check, ChevronDown, Info, ArrowLeftRight, Undo2, History, Pencil, TrendingUp } from "lucide-react";
+import { X, Check, ChevronDown, Info, ArrowLeftRight, Undo2, History, Pencil, TrendingUp, Maximize2 } from "lucide-react";
 import { fmtShort } from "../lib/dates.js";
 import { EQ, effSets, effRir } from "../data/program.js";
 import { SUB_KIND, SUBS } from "../data/subs.js";
@@ -51,6 +51,11 @@ export function SwapModal({ ex, week, current, onPick, onClose }) {
   );
 }
 
+// El ejercicio con los datos del sustituto (si hay uno activo): lo comparten la tarjeta y el modo entreno.
+export function withAlt(original, alt) {
+  return alt ? { ...original, name: alt.name, eq: alt.eq, reps: alt.reps, tempo: alt.tempo, rir: alt.rir, tips: [alt.why, ...original.tips.slice(0, 1)] } : original;
+}
+
 export function ExerciseCard({
   ex: original,
   alt,
@@ -64,6 +69,7 @@ export function ExerciseCard({
   last,
   series = [],
   onSaveSet,
+  onFocus,
 }) {
   const [open, setOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
@@ -73,7 +79,7 @@ export function ExerciseCard({
   const pressTimer = useRef(null);
   const didLongPress = useRef(false);
 
-  const ex = alt ? { ...original, name: alt.name, eq: alt.eq, reps: alt.reps, tempo: alt.tempo, rir: alt.rir, tips: [alt.why, ...original.tips.slice(0, 1)] } : original;
+  const ex = withAlt(original, alt);
   const n = effSets(original, week);
   const count = done.filter(Boolean).length;
   const complete = count >= n;
@@ -157,6 +163,11 @@ export function ExerciseCard({
           )}
           <div className="mt-1.5 flex flex-wrap gap-1.5">{ex.eq.map((e) => <Chip key={e}>{EQ[e]}</Chip>)}</div>
         </div>
+        {onFocus && (
+          <button type="button" onClick={onFocus} className="-mr-1 -mt-1 grid h-10 w-10 shrink-0 place-items-center rounded-xl text-muted hover:bg-surface2 hover:text-accent" aria-label={`Abrir ${ex.name} en modo entreno`} title="Modo entreno desde aquí">
+            <Maximize2 size={18} />
+          </button>
+        )}
       </div>
       <dl className="mt-3 grid grid-cols-[0.8fr_1.6fr_0.6fr_1.2fr] gap-2 rounded-xl bg-surface2 px-3 py-2 text-center">
         <div><dt className="text-[10px] uppercase tracking-widest text-muted">Series</dt><dd className="font-mono text-sm tabular-nums">{n}</dd></div>

@@ -113,7 +113,7 @@ Cinco pestañas: Inicio (por defecto) · Entreno · Salud · Hábitos · Ajustes
 - `lib/home.js` (`weekProgress`, `todayPlan`) con pruebas. Entreno queda solo con la rutina; recibe `initialRid` desde Inicio.
 - La app abre en Inicio, salvo que se haya cerrado a mitad de un entreno hace menos de 2 horas.
 
-### ⬜ U2 · Modo entreno y resumen al terminar
+### ✅ U2 · Modo entreno y resumen al terminar
 Depende de U1. Toca `views/TrainView.jsx`, `components/ExerciseCard.jsx` y componentes nuevos; nada más en paralelo con esos archivos.
 - **Modo entreno** (como Strong o Hevy): un botón en el encabezado de la rutina abre una vista a pantalla completa con un ejercicio a la vez: nombre, serie actual (p. ej. «Serie 2 de 4»), reps, carga y RIR sugeridos (`lib/progression.js`), un botón grande «Serie hecha» que registra la serie igual que hoy (`setLog`) y arranca el descanso, y «Siguiente ejercicio». Cerrar vuelve a la lista sin perder nada.
 - **Resumen al terminar** (como Hevy o Fitbod): al completar todas las series, o al tocar «Terminar», una hoja con duración, series hechas, carga total levantada (reps × carga) y marcas nuevas frente a la última vez (`getLastExerciseLog`). Botón «Registrar sesión» que hace lo mismo que «Ya la hice».
