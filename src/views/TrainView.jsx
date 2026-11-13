@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Check, Zap, BatteryLow, Trophy, Watch } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Check, Zap, BatteryLow, Trophy, Watch, Play, Flag } from "lucide-react";
 import { dkey, pruneDays } from "../lib/dates.js";
 import { usePersisted } from "../lib/storage.js";
 import { getLastExerciseLog, resolveDefaultSet, recordSet, removeSet, updateExerciseLoad } from "../lib/setLog.js";
@@ -8,7 +8,10 @@ import { MAX_RUN_LEVEL, getRunLevel } from "../data/runPlan.js";
 import { ROUTINES, BLOCK_WEEKS, effSets, routineById } from "../data/program.js";
 import { altFor } from "../data/subs.js";
 import { ProgressBar } from "../components/ui.jsx";
-import { SwapModal, ExerciseCard } from "../components/ExerciseCard.jsx";
+import { SwapModal, ExerciseCard, withAlt } from "../components/ExerciseCard.jsx";
+import { WorkoutMode } from "../components/WorkoutMode.jsx";
+import { WorkoutSummary } from "../components/WorkoutSummary.jsx";
+import { touchSession, finishSession, buildWorkoutSummary, nextPendingExercise } from "../lib/workout.js";
 import { useFitbitShortcut, buildFitbitShortcutUrl } from "../components/FitbitShortcutCard.jsx";
 
 export function TrainView({ sets, setSets, log, setLog, block, swaps, setSwaps, loads, setLoads, lastLoads, setLastLoads, startTimer, openWarmup, wp, initialRid }) {
@@ -18,6 +21,10 @@ export function TrainView({ sets, setSets, log, setLog, block, swaps, setSwaps, 
   const [seriesLog, setSeriesLog] = usePersisted("setLog", {});
   const [runLevel, setRunLevel] = usePersisted("runLevel", DEFAULT_RUN_LEVEL);
   const [fitbitShortcut] = useFitbitShortcut();
+  // Hora de inicio y fin del entreno de hoy (solo en este dispositivo, para la duración del resumen).
+  const [session, setSession] = usePersisted("trainSession", null);
+  const [mode, setMode] = useState(null); // modo entreno abierto: { start: índice del ejercicio }
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const activeRunLevel = getDisplayRunLevel(runLevel, today);
   const runPlan = getRunLevel(activeRunLevel);
   const routine = routineById(rid, activeRunLevel);
@@ -86,6 +93,41 @@ export function TrainView({ sets, setSets, log, setLog, block, swaps, setSwaps, 
   }, 0);
   const progress = total ? done / total : 0;
   const logged = log[today];
+  const todaySession = session && session.date === today && session.rid === rid ? session : null;
+  const touch = () => setSession((s) => touchSession(s, { date: today, routineId: rid, now: Date.now() }));
+  const registerSession = () => setLog((l) => ({ ...l, [today]: { r: rid, at: Date.now() } }));
+
+  // Cada ejercicio con lo que necesitan la tarjeta, el modo entreno y el resumen.
+  const items = routine.exercises.map((ex) => {
+    const n = effSets(ex, week);
+    const series = daySetLog[ex.id] || [];
+    const boxes = daySets[ex.id] || [];
+    const alt = altFor(ex.id, daySwaps[ex.id]);
+    return {
+      ex, alt, n, series,
+      view: withAlt(ex, alt),
+      done: Array.from({ length: n }, (_, i) => !!series[i] || !!boxes[i]),
+      currentLoad: dayLoads[ex.id] || (series.slice().reverse().find((s) => s && s.load)?.load) || "",
+      last: lastFor(ex.id),
+      lastLog: getLastExerciseLog(seriesLog, ex.id, today, rid),
+    };
+  });
+  const openMode = (start) => {
+    touch();
+    const first = nextPendingExercise(items.map((it) => it.done), 0);
+    setMode({ start: start != null ? start : Math.max(0, first) });
+  };
+  const finish = () => {
+    setSession((s) => finishSession(s, { date: today, routineId: rid, now: Date.now() }));
+    setSummaryOpen(true);
+  };
+  // Al completar la última serie (aquí mismo, no por sincronización) se abre el resumen.
+  const prevProgress = useRef({ rid, progress });
+  useEffect(() => {
+    const prev = prevProgress.current;
+    prevProgress.current = { rid, progress };
+    if (prev.rid === rid && prev.progress < 1 && progress >= 1 && todaySession) finish();
+  }, [rid, progress]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (hasInactivityDecay(runLevel, today)) {
@@ -128,6 +170,7 @@ export function TrainView({ sets, setSets, log, setLog, block, swaps, setSwaps, 
         return Object.fromEntries(keep.map((k) => [k, next[k]]));
       });
     } else {
+      touch();
       const lastSession = getLastExerciseLog(seriesLog, ex.id, today, rid);
       const resolved = resolveDefaultSet({
         series: exSeries,
@@ -170,6 +213,7 @@ export function TrainView({ sets, setSets, log, setLog, block, swaps, setSwaps, 
     const exSeries = daySetLog[ex.id] || [];
     const was = !!exSeries[i] || !!(daySets[ex.id] || [])[i];
 
+    touch();
     setSeriesLog((all) => recordSet({
       setLog: all,
       date: today,
@@ -231,7 +275,10 @@ export function TrainView({ sets, setSets, log, setLog, block, swaps, setSwaps, 
                 </p>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              <button onClick={() => openMode()} className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accentInk shadow-lg sm:w-auto">
+                <Play size={16} />Modo entreno
+              </button>
               {!fitbitShortcut.hidden && (
                 <a
                   href={buildFitbitShortcutUrl(fitbitShortcut.name)}
@@ -241,52 +288,79 @@ export function TrainView({ sets, setSets, log, setLog, block, swaps, setSwaps, 
                   Empezar con Fitbit
                 </a>
               )}
-              <button onClick={openWarmup} className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accentInk shadow-lg"><Zap size={16} />Modo Arranque (5 min)</button>
+              <button onClick={openWarmup} className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface2 px-3.5 py-2.5 text-sm font-semibold text-fg transition hover:border-accent hover:text-accent"><Zap size={16} className="text-accent" />Modo Arranque (5 min)</button>
             </div>
           </div>
           <div className="mt-4 flex items-center gap-3">
             <ProgressBar value={progress} />
             <span className="shrink-0 font-mono text-sm tabular-nums">{done}/{total}</span>
           </div>
+          {done > 0 && (
+            <button onClick={finish} className="mt-2 mr-2 inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-accent hover:text-accent">
+              <Flag size={14} />Terminar y ver resumen
+            </button>
+          )}
           {logged ? (
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
               <span className="inline-flex items-center gap-1.5 text-good"><Trophy size={14} />Sesión registrada hoy: {routineById(logged.r).name}</span>
               <button onClick={() => { if (logged.r === "d3") setRunLevel((prev) => undoRunSession(prev, today)); setLog((l) => { const n = { ...l }; delete n[today]; return n; }); }} className="rounded-lg px-2 py-1 text-muted hover:bg-surface2 hover:text-fg">Quitar registro</button>
             </div>
           ) : (
-            <button onClick={() => setLog((l) => ({ ...l, [today]: { r: rid, at: Date.now() } }))} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-good/40 px-3 py-1.5 text-xs text-good hover:bg-good/10">
+            <button onClick={registerSession} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-good/40 px-3 py-1.5 text-xs text-good hover:bg-good/10">
               <Check size={14} />Ya la hice: registrar sesión de hoy
             </button>
           )}
         </section>
 
         <div className="grid gap-3 2xl:grid-cols-2">
-          {routine.exercises.map((ex) => {
-            const n = effSets(ex, week);
-            const exSeries = daySetLog[ex.id] || [];
-            const exDaySets = daySets[ex.id] || [];
-            const doneArr = Array.from({ length: n }, (_, i) => !!exSeries[i] || !!exDaySets[i]);
-            const currentLoad = dayLoads[ex.id] || (exSeries.slice().reverse().find((s) => s && s.load)?.load) || "";
-
-            return (
-              <ExerciseCard
-                key={ex.id + week}
-                ex={ex}
-                alt={altFor(ex.id, daySwaps[ex.id])}
-                week={week}
-                done={doneArr}
-                series={exSeries}
-                onToggle={(i, count) => toggle(ex, i, count)}
-                onSaveSet={(i, reps, load, count) => saveSet(ex, i, reps, load, count)}
-                onSwap={() => setSwapFor(ex.id)}
-                onRevert={() => setSwap(ex.id, null)}
-                load={currentLoad}
-                onLoad={(v) => setLoad(ex.id, v)}
-                last={lastFor(ex.id)}
-              />
-            );
-          })}
+          {items.map(({ ex, alt, done: doneArr, series: exSeries, currentLoad, last }, idx) => (
+            <ExerciseCard
+              key={ex.id + week}
+              ex={ex}
+              alt={alt}
+              week={week}
+              done={doneArr}
+              series={exSeries}
+              onToggle={(i, count) => toggle(ex, i, count)}
+              onSaveSet={(i, reps, load, count) => saveSet(ex, i, reps, load, count)}
+              onSwap={() => setSwapFor(ex.id)}
+              onRevert={() => setSwap(ex.id, null)}
+              load={currentLoad}
+              onLoad={(v) => setLoad(ex.id, v)}
+              last={last}
+              onFocus={() => openMode(idx)}
+            />
+          ))}
         </div>
+        {mode && (
+          <WorkoutMode
+            key={rid}
+            routine={routine}
+            week={week}
+            items={items}
+            startIndex={mode.start}
+            session={todaySession}
+            onSaveSet={(it, i, reps, load) => saveSet(it.ex, i, reps, load, it.n)}
+            onRemoveSet={(it, i) => toggle(it.ex, i, it.n)}
+            onSwap={(exId) => setSwapFor(exId)}
+            onClose={() => setMode(null)}
+            onFinish={finish}
+          />
+        )}
+        {summaryOpen && (
+          <WorkoutSummary
+            routine={routine}
+            summary={buildWorkoutSummary({
+              exercises: items.map((it) => ({ id: it.ex.id, name: it.view.name, reps: it.view.reps, sets: it.n })),
+              setLog: seriesLog, sets, loads, date: today, routineId: rid, session, now: Date.now(),
+            })}
+            logged={!!logged && logged.r === rid}
+            onRegister={registerSession}
+            onContinue={() => { setSummaryOpen(false); if (!mode) openMode(); }}
+            onClose={() => setSummaryOpen(false)}
+            onDone={() => { setSummaryOpen(false); setMode(null); }}
+          />
+        )}
         {swapEx && <SwapModal ex={swapEx} week={week} current={daySwaps[swapEx.id]} onPick={(altId) => { setSwap(swapEx.id, altId); setSwapFor(null); }} onClose={() => setSwapFor(null)} />}
       </div>
 
