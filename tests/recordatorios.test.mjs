@@ -141,6 +141,7 @@ test("buildWeeklySummary resume entrenos y minutos por tipo, % de hábitos oblig
   );
 
   assert.equal(summary.workoutsCount, 4);
+  assert.equal(summary.url, "https://mauxz7.github.io/espaldera/?ver=revision");
   assert.equal(summary.totalMin, 140);
   assert.deepEqual(summary.byKind.strength, { count: 2, min: 85 });
   assert.deepEqual(summary.byKind.run, { count: 1, min: 30 });
@@ -263,6 +264,7 @@ test("main con --resumen envía el resumen semanal y con --test imprime sin envi
   const res = await main({ root, now: at("2026-11-12T18:00:00Z"), argv: ["--resumen"], send });
   assert.equal(res.sent, 1);
   assert.equal(bodies[0].title, "Resumen semanal");
+  assert.equal(bodies[0].url, "https://mauxz7.github.io/espaldera/?ver=revision");
   assert.match(bodies[0].body, /43% \(3\/7 días\)/);
   assert.match(bodies[0].body, /Racha actual: 3 días/);
 });

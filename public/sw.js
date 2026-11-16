@@ -34,7 +34,7 @@ self.addEventListener("notificationclick", (e) => {
   const target = new URL((e.notification.data && e.notification.data.url) || "./", self.registration.scope).href;
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
     const open = list.find((c) => c.url.startsWith(self.registration.scope));
-    if (open) return open.focus();
+    if (open) return Promise.resolve(open.focus()).catch(() => {}).then(() => open.postMessage({ type: "open", url: target }));
     return self.clients.openWindow(target);
   }));
 });

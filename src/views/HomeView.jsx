@@ -8,6 +8,7 @@ import { lastNight, isPoorSleep, fmtSleep } from "../lib/sleep.js";
 import { WeekCard } from "../components/WeekCard.jsx";
 import { BlockCard } from "../components/BlockCard.jsx";
 import { IdentityCard } from "../components/IdentityCard.jsx";
+import { ReviewCard } from "../components/ReviewCard.jsx";
 import { HabitsMini } from "../components/Habits.jsx";
 import { useFitbitShortcut, buildFitbitShortcutUrl } from "../components/FitbitShortcutCard.jsx";
 
@@ -32,7 +33,7 @@ function Ring({ value, goal, label, sub, color }) {
   );
 }
 
-export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBlock, goTrain }) {
+export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBlock, goTrain, wins, setWins, reviews, openReview }) {
   const today = dkey();
   const [workouts] = usePersisted("workouts", []);
   const [fitbit] = useFitbitShortcut();
@@ -131,6 +132,7 @@ export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBloc
 
       <aside className="grid min-w-0 content-start gap-4 md:grid-cols-2 xl:grid-cols-1">
         <IdentityCard wp={wp} log={log} habits={habits} habitDefs={habitDefs} />
+        <ReviewCard wins={wins} setWins={setWins} reviews={reviews} onOpenReview={openReview} />
         <BlockCard block={block} setBlock={setBlock} />
         <section className="rounded-2xl border border-line bg-surface p-4">
           <h2 className="mb-2 font-display text-lg font-semibold uppercase tracking-wide">Hábitos de hoy</h2>
