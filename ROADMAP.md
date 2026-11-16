@@ -172,7 +172,7 @@ El plan se calculaba por semana (lun–dom) y el lunes se planeaba «en blanco»
 - Votos para «Persona descansada»: noche de 7 h o más, o dormirse antes de las 11 p.m.
 - En Inicio: «Dormiste 6 h 50 min» y, con menos de 6 h y una sesión planeada, la sugerencia de cambiar a la sesión suave.
 
-### D3 · Revisión semanal y frasco de logros
+### ✅ D3 · Revisión semanal y frasco de logros
 - El domingo, una pantalla corta: votos por identidad, entrenos, lo que salió bien, qué ajustar (texto libre guardado en la clave `reviews`). El aviso «Resumen semanal» abre esta pantalla.
 - **Frasco de logros:** anotar logros pequeños durante la semana y verlos en la revisión.
 
