@@ -1,15 +1,16 @@
 import { Droplets, Pill, FlaskConical, PackageCheck, MonitorOff, BookOpen, Milk, Apple, Check, Hash } from "lucide-react";
 
 // Definiciones iniciales: 7 hábitos existentes con sus mismos IDs + «Comer una fruta» (opcional).
+// `identity` es la identidad por la que vota cada hábito (ver src/data/identities.js).
 export const DEFAULT_HABIT_DEFS = [
-  { id: "o_creatine", label: "Tomar creatina todos los días.", group: "req", kind: "check", target: 1, unit: "", remindAt: "12:00" },
-  { id: "o_prep", label: "Alistar la creatina del día siguiente.", group: "req", kind: "check", target: 1, unit: "", remindAt: null },
-  { id: "o_water", label: "Tomar 2 botellas de agua (2L en total).", group: "req", kind: "count", target: 2, unit: "botellas", remindAt: null },
-  { id: "o_pills", label: "Tomar pastillas (magnesio, omega 3, vitamina C).", group: "req", kind: "check", target: 1, unit: "", remindAt: null },
-  { id: "o_screens", label: "Dejar dispositivos electrónicos a las 10:30 p.m.", group: "req", kind: "check", target: 1, unit: "", remindAt: null },
-  { id: "f_read", label: "Leer 15 min de libro personal.", group: "opt", kind: "check", target: 1, unit: "", remindAt: null },
-  { id: "f_shake", label: "Tomar batido de proteína.", group: "opt", kind: "check", target: 1, unit: "", remindAt: null },
-  { id: "f_fruit", label: "Comer una fruta.", group: "opt", kind: "check", target: 1, unit: "", remindAt: null },
+  { id: "o_creatine", label: "Tomar creatina todos los días.", group: "req", kind: "check", target: 1, unit: "", remindAt: "12:00", identity: "atleta" },
+  { id: "o_prep", label: "Alistar la creatina del día siguiente.", group: "req", kind: "check", target: 1, unit: "", remindAt: null, identity: "atleta" },
+  { id: "o_water", label: "Tomar 2 botellas de agua (2L en total).", group: "req", kind: "count", target: 2, unit: "botellas", remindAt: null, identity: "atleta" },
+  { id: "o_pills", label: "Tomar pastillas (magnesio, omega 3, vitamina C).", group: "req", kind: "check", target: 1, unit: "", remindAt: null, identity: "atleta" },
+  { id: "o_screens", label: "Dejar dispositivos electrónicos a las 10:30 p.m.", group: "req", kind: "check", target: 1, unit: "", remindAt: null, identity: "descanso" },
+  { id: "f_read", label: "Leer 15 min de libro personal.", group: "opt", kind: "check", target: 1, unit: "", remindAt: null, identity: "lector" },
+  { id: "f_shake", label: "Tomar batido de proteína.", group: "opt", kind: "check", target: 1, unit: "", remindAt: null, identity: "atleta" },
+  { id: "f_fruit", label: "Comer una fruta.", group: "opt", kind: "check", target: 1, unit: "", remindAt: null, identity: "atleta" },
 ];
 
 export const HABIT_ICONS = {
