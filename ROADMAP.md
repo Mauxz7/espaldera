@@ -120,7 +120,64 @@ Depende de U1. Toca `views/TrainView.jsx`, `components/ExerciseCard.jsx` y compo
 - Botones de al menos 48 px de alto, legibles con el teléfono en la mano. Funciones de cálculo puras en `lib/` con pruebas.
 - **Listo cuando:** se ve bien a 375 px, nada del registro actual cambia de forma y `npm test` pasa.
 
+## Fase 7 · Shift y Google Calendar
+
+La app deja de ser solo de entreno: pasa a llamarse **Shift** (hábitos e identidad). Estudio, focus y exámenes siguen en Mana Core (app aparte); Shift no los duplica.
+
+### C1 · Renombrar a Shift
+- Nombre visible, `<title>`, manifest (`name`, `short_name`), encabezados y títulos de las notificaciones (`scripts/recordatorios.mjs` y su COPIA en el repo privado).
+- **No** cambiar: el prefijo `fitpanel:` de localStorage, las claves de `data.json`, la URL ni el nombre del repo (rompería los datos y la app instalada).
+- **Listo cuando:** la app instalada se actualiza sola y muestra «Shift»; `npm test` pasa.
+
+### C2 · Escribir el plan en un calendario «Shift» · **Reservada para Claude**
+- La app guarda el plan calculado en la clave sincronizada `calPlan`: `[{ date, rid, title, start "HH:MM", min }]` para esta semana y la siguiente. Se reescribe cuando cambia el plan (reacomodar, marcar oficina/noche, cambiar de bloque).
+- Repo privado: flujo «Calendario» (al hacer push de `data.json` + una vez al día) corre `scripts/calendario.mjs` (COPIA del público). Crea el calendario secundario «Shift» si no existe y hace upsert por fecha usando `extendedProperties.private.shiftKey`; borra los eventos de fechas que ya no tienen sesión. **Solo toca el calendario Shift**, nunca el principal.
+- Título tipo «🏋️ Día 2 · Pierna & Core», descripción con los ejercicios, duración = minutos de la rutina.
+- Permisos mínimos: `calendar.app.created` (crear y editar solo calendarios hechos por la app) + `calendar.events.readonly` (C3). Se añaden al `SCOPE` de `scripts/google-health-auth.mjs`; el usuario activa la Calendar API en su proyecto de Google Cloud y vuelve a correr el script.
+- **Listo cuando:** reacomodar la semana en el teléfono cambia los eventos en Google Calendar en menos de ~2 min.
+
+### C3 · Leer el calendario para llenar la semana · **Reservada para Claude**
+- El selector manual de oficina/casa/noche de la app es la fuente de verdad: el horario base del calendario cambia seguido y no siempre se actualiza. El calendario solo **sugiere**.
+- El mismo flujo lee el calendario principal (14 días) y escribe la clave `calBusy`: `{ "YYYY-MM-DD": { nightBusy, exam } }`. Oficina/casa **no** se lee del calendario.
+  - `nightBusy`: un evento ocupado (no transparente) que cruza 18:30–21:00. Se ignoran los eventos que empiezan con «🏋️» (entrenos viejos) y los del calendario Shift.
+  - `exam`: título con «Examen», «Entrega», «Parcial» o «Quiz».
+- `planner.js` usa `calBusy` solo para días sin marca manual de noche; lo que el usuario marque a mano siempre gana. Si `calBusy` dice noche ocupada pero el usuario la marcó libre, no se avisa ni se corrige. Día de examen o el anterior: preferir sesión suave o descanso.
+- Las reglas de lectura van en funciones puras con pruebas (sin datos personales en las pruebas).
+
+## Fase 8 · Identidad
+
+### I1 · Identidades y votos
+- Cuatro identidades iniciales, editables: **Atleta**, **Estudiante de Derecho**, **Lector**, **Persona descansada**. Cada hábito se asigna a una.
+- Cada hábito cumplido = un «voto» para esa identidad. Tarjeta en Inicio con los votos de la semana por identidad (barras o anillos), frase tipo «Esta semana votaste 9 veces por ser Atleta».
+- Puente opcional con Mana Core: minutos de focus del día como votos de Estudiante (ver M1).
+
+### I2 · Mejores hábitos
+- **Apilar:** cada hábito puede tener un «después de…» (ancla) que se muestra en el recordatorio y en la lista.
+- **Versión de 2 minutos:** cada hábito tiene una versión mínima; marcarla cuenta como hecho (con otra marca visual) para no romper la racha.
+- **Nunca fallar dos veces:** si ayer falló un hábito obligatorio, hoy aparece destacado y el aviso del servidor lo menciona. Las rachas pasan a medir «sin dos fallos seguidos».
+
+## Fase 9 · Dopamina, sueño y revisión
+
+### D1 · Dopamina buena y mala
+- Lista de «dopamina barata» con límite diario (p. ej. redes, videos cortos) que se registra con un toque, y lista de «dopamina buena» (leer, entrenar, caminar, estudiar) que suma votos.
+- Contador del día y de la semana en Hábitos; nada de bloqueo, solo registro honesto.
+
+### D2 · Sueño desde Fitbit
+- Ampliar el flujo de Google Health para traer sueño (duración y hora de dormir) a la clave `sleep`. Requiere el permiso de sueño en el script de autorización.
+- Votos automáticos para «Persona descansada» (p. ej. ≥ 7 h o dormir antes de la hora meta). Si durmió poco, el plan sugiere sesión suave.
+
+### D3 · Revisión semanal y frasco de logros
+- El domingo, una pantalla corta: votos por identidad, entrenos, lo que salió bien, qué ajustar (texto libre guardado en la clave `reviews`). El aviso «Resumen semanal» abre esta pantalla.
+- **Frasco de logros:** anotar logros pequeños durante la semana y verlos en la revisión.
+
+### M1 · Puente con Mana Core (opcional)
+- Mana Core escribe los minutos de focus del día en el repo privado (o Shift los lee de Notion vía flujo). Shift solo los muestra como votos de Estudiante; no hay timer ni exámenes en Shift.
+
 ## Qué se puede hacer en paralelo ahora
+
+- **Fase 7:** C1 primero (toca muchos archivos de texto); C2 y C3 los hace Claude juntos porque comparten script y permisos.
+- **Fase 8:** I1 antes de I2 (I2 usa la identidad de cada hábito).
+- **Fase 9:** D1 y D3 en paralelo; D2 después de C2/C3 (mismo script de autorización).
 
 - **N1, N2 y N3** no comparten archivos: van en paralelo.
 

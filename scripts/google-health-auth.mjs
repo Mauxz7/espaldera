@@ -1,4 +1,4 @@
-// Autoriza Espaldera a leer tus entrenos de Google Health (Fitbit) y guarda los secretos en el repo privado.
+// Autoriza a leer tus entrenos de Google Health (Fitbit) y a usar Google Calendar; guarda los secretos en el repo privado.
 // Se corre en tu Mac:  node scripts/google-health-auth.mjs
 // Requisitos: un proyecto de Google Cloud con la «Google Health API» activada y un cliente OAuth
 // de tipo «Desktop app» (la guía está en Ajustes → Entrenos de Fitbit), y `gh` con sesión iniciada.
@@ -8,6 +8,13 @@ import crypto from "node:crypto";
 import readline from "node:readline";
 import { spawnSync } from "node:child_process";
 import { SCOPE, fetchExercises } from "./google-health.mjs";
+
+// Calendario (Fase 7): crear y editar solo el calendario «Shift» que hace la app + leer eventos para sugerir noches ocupadas y exámenes.
+// Va en un token APARTE: la Google Health API rechaza tokens que traen otros permisos (DISALLOWED_OAUTH_SCOPES).
+export const CALENDAR_SCOPES = [
+  "https://www.googleapis.com/auth/calendar.app.created",
+  "https://www.googleapis.com/auth/calendar.events.readonly",
+].join(" ");
 
 const REPO = process.env.ESPALDERA_DATA_REPO || "Mauxz7/espaldera-data";
 
@@ -34,7 +41,7 @@ function setSecret(name, value) {
 }
 
 // Servidor local de un solo uso que recibe el código de Google (redirección «loopback» de apps Desktop).
-function listen() {
+function listen(mustInclude, what) {
   return new Promise((resolve) => {
     let done;
     const code = new Promise((ok, fail) => (done = { ok, fail }));
@@ -42,35 +49,31 @@ function listen() {
       const url = new URL(req.url, "http://127.0.0.1");
       if (url.pathname !== "/") return res.writeHead(404).end();
       const c = url.searchParams.get("code");
-      const granted = (url.searchParams.get("scope") || "").includes("googlehealth.activity_and_fitness");
+      const granted = (url.searchParams.get("scope") || "").includes(mustInclude);
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end(c && granted
         ? "<h2>Listo. Ya puedes cerrar esta pestaña y volver a la terminal.</h2>"
-        : "<h2>Falta el permiso de actividad y ejercicio. Vuelve a intentarlo y deja marcada esa casilla.</h2>");
+        : `<h2>Falta el permiso de ${what}. Vuelve a intentarlo y deja marcadas todas las casillas.</h2>`);
       server.close();
-      c && granted ? done.ok(c) : done.fail(new Error("Google no dio permiso para leer actividad y ejercicio."));
+      c && granted ? done.ok(c) : done.fail(new Error(`Google no dio permiso de ${what}.`));
     });
     server.listen(0, "127.0.0.1", () => resolve({ port: server.address().port, code }));
   });
 }
 
-async function main() {
-  console.log("Conectar Google Health (Fitbit) con Espaldera\n");
-  const clientId = await ask("Client ID (termina en .apps.googleusercontent.com): ");
-  const clientSecret = await ask("Client secret (no se verá al escribir): ", true);
-  if (!clientId.endsWith(".apps.googleusercontent.com") || !clientSecret) throw new Error("Revisa el Client ID y el Client secret.");
-
-  const { port, code: codeP } = await listen();
+// Un viaje completo a Google para un conjunto de permisos; devuelve los tokens.
+async function authorize(clientId, clientSecret, scope, mustInclude, what) {
+  const { port, code: codeP } = await listen(mustInclude, what);
   const redirect = `http://127.0.0.1:${port}`;
   const verifier = crypto.randomBytes(32).toString("base64url");
   const challenge = crypto.createHash("sha256").update(verifier).digest("base64url");
   const auth = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   auth.search = new URLSearchParams({
-    client_id: clientId, redirect_uri: redirect, response_type: "code", scope: SCOPE,
+    client_id: clientId, redirect_uri: redirect, response_type: "code", scope,
     access_type: "offline", prompt: "consent", code_challenge: challenge, code_challenge_method: "S256",
   }).toString();
-  console.log("\nSe abre Google en el navegador. Elige tu cuenta; si dice «Google no verificó esta app»,");
-  console.log("toca «Avanzado» → «Ir a Espaldera», marca el permiso de actividad y toca «Continuar».");
+  console.log(`\n→ Permiso de ${what}. Se abre Google en el navegador. Elige tu cuenta; si dice «Google no verificó esta app»,`);
+  console.log("  toca «Avanzado» → «Ir a Espaldera», marca todas las casillas y toca «Continuar».");
   console.log("\nSi el navegador no se abre solo, copia este enlace completo y pégalo en Chrome o Safari:\n");
   console.log(auth.toString());
   console.log("\nEsperando la respuesta de Google… (deja esta ventana abierta)");
@@ -88,17 +91,55 @@ async function main() {
     }).toString(),
   });
   const tok = await res.json().catch(() => ({}));
-  if (!res.ok || !tok.refresh_token) throw new Error(`Google no entregó el token (${res.status} ${tok.error || ""}).`);
+  if (!res.ok || !tok.refresh_token) {
+    const hint = tok.error === "invalid_client" ? " El Client secret no coincide: cópialo de nuevo desde Google Cloud." : "";
+    throw new Error(`Google no entregó el token (${res.status} ${tok.error || ""}).${hint}`);
+  }
+  return tok;
+}
 
+async function healthStep(clientId, clientSecret) {
+  const tok = await authorize(clientId, clientSecret, SCOPE, "googlehealth.activity_and_fitness", "actividad y ejercicio (Fitbit)");
   // Prueba real antes de guardar: ¿la API responde con tus entrenos?
   const since = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   const points = await fetchExercises(fetch, tok.access_token, since);
-  console.log(`\nGoogle Health respondió: ${points.length} entrenos en los últimos 30 días.\n`);
-
+  console.log(`\nGoogle Health respondió: ${points.length} entrenos en los últimos 30 días.`);
   setSecret("GOOGLE_HEALTH_CLIENT_ID", clientId);
   setSecret("GOOGLE_HEALTH_CLIENT_SECRET", clientSecret);
   setSecret("GOOGLE_HEALTH_REFRESH_TOKEN", tok.refresh_token);
-  console.log("\nTodo listo. La tarea «Google Health» del repo privado traerá tus entrenos.");
+}
+
+async function calendarStep(clientId, clientSecret) {
+  const tok = await authorize(clientId, clientSecret, CALENDAR_SCOPES, "calendar", "calendario");
+  const cal = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events?maxResults=1&singleEvents=true&timeMin=" + encodeURIComponent(new Date().toISOString()), {
+    headers: { Authorization: `Bearer ${tok.access_token}` },
+  });
+  if (!cal.ok) {
+    const body = await cal.text();
+    if (/accessNotConfigured|SERVICE_DISABLED|has not been used/.test(body)) throw new Error("Falta activar la Google Calendar API en tu proyecto de Google Cloud (APIs y servicios → Biblioteca → Google Calendar API → Habilitar). Actívala y corre: node scripts/google-health-auth.mjs --solo-calendario");
+    throw new Error(`Google Calendar respondió ${cal.status}. ${body.replace(/\s+/g, " ").slice(0, 300)}`);
+  }
+  console.log("\nGoogle Calendar respondió: permiso de calendario listo.");
+  setSecret("GOOGLE_CLIENT_ID", clientId);
+  setSecret("GOOGLE_CLIENT_SECRET", clientSecret);
+  setSecret("GOOGLE_CALENDAR_REFRESH_TOKEN", tok.refresh_token);
+}
+
+// Uso:  node scripts/google-health-auth.mjs                    → Fitbit y luego calendario (dos pantallas de Google)
+//       node scripts/google-health-auth.mjs --solo-calendario  → solo el calendario
+//       node scripts/google-health-auth.mjs --solo-fitbit      → solo Fitbit (renovar cada 7 días)
+async function main() {
+  const args = process.argv.slice(2);
+  const doHealth = !args.includes("--solo-calendario");
+  const doCalendar = !args.includes("--solo-fitbit");
+  console.log("Conectar Google (Fitbit y Calendario) con Shift\n");
+  const clientId = await ask("Client ID (termina en .apps.googleusercontent.com): ");
+  const clientSecret = await ask("Client secret (no se verá al escribir): ", true);
+  if (!clientId.endsWith(".apps.googleusercontent.com") || !clientSecret) throw new Error("Revisa el Client ID y el Client secret.");
+
+  if (doHealth) await healthStep(clientId, clientSecret);
+  if (doCalendar) await calendarStep(clientId, clientSecret);
+  console.log("\nTodo listo.");
 }
 
 main().catch((e) => {

@@ -89,7 +89,10 @@ export async function fetchExercises(fetchImpl, token, since) {
     const q = new URLSearchParams({ pageSize: "25", filter: `exercise.interval.civil_start_time >= "${since}"` });
     if (pageToken) q.set("pageToken", pageToken);
     const res = await fetchImpl(`${API}?${q}`, { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) throw new Error(`Google Health respondió ${res.status} al pedir entrenos.`);
+    if (!res.ok) {
+      const why = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 400);
+      throw new Error(`Google Health respondió ${res.status} al pedir entrenos. ${why}`);
+    }
     const j = await res.json();
     out.push(...(j.dataPoints || []));
     pageToken = j.nextPageToken || "";
