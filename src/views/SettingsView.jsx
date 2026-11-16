@@ -18,8 +18,10 @@ import { DEFAULT_REPO, Sync, useSyncStatus, usePersisted } from "../lib/storage.
 import { hhmm } from "../lib/dates.js";
 import { DEFAULT_HABIT_DEFS, getHabitIcon } from "../data/habits.js";
 import { DEFAULT_IDENTITIES, habitIdentity } from "../data/identities.js";
+import { DEFAULT_DOPAMINE_DEFS } from "../data/dopamine.js";
 import { normalizeIdentities } from "../lib/identity.js";
 import { IdentityEditor } from "../components/IdentityEditor.jsx";
+import { DopamineEditor } from "../components/DopamineEditor.jsx";
 import { PushCard } from "../components/PushCard.jsx";
 import { HealthIntakeCard } from "../components/HealthIntakeCard.jsx";
 import { FitbitShortcutCard } from "../components/FitbitShortcutCard.jsx";
@@ -43,6 +45,7 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
   const [editingId, setEditingId] = useState(null); // null | "new" | id
   const [showArchived, setShowArchived] = useState(false);
   const [identities, setIdentities] = usePersisted("identities", DEFAULT_IDENTITIES);
+  const [dopamineDefs, setDopamineDefs] = usePersisted("dopamineDefs", DEFAULT_DOPAMINE_DEFS);
   const idList = normalizeIdentities(identities);
   const identityOf = (hb) => idList.find((it) => it.id === habitIdentity(hb)) || null;
   const [form, setForm] = useState({
@@ -539,6 +542,8 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
       </section>
 
       <IdentityEditor identities={identities} setIdentities={setIdentities} />
+
+      <DopamineEditor defs={dopamineDefs} setDefs={setDopamineDefs} identities={idList} />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">

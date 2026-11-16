@@ -4,9 +4,11 @@ import { dkey, DAYS_LONG } from "../lib/dates.js";
 import { usePersisted } from "../lib/storage.js";
 import { routineById, BLOCK_WEEKS } from "../data/program.js";
 import { weekProgress, todayPlan } from "../lib/home.js";
+import { lastNight, isPoorSleep, fmtSleep } from "../lib/sleep.js";
 import { WeekCard } from "../components/WeekCard.jsx";
 import { BlockCard } from "../components/BlockCard.jsx";
 import { IdentityCard } from "../components/IdentityCard.jsx";
+import { ReviewCard } from "../components/ReviewCard.jsx";
 import { HabitsMini } from "../components/Habits.jsx";
 import { useFitbitShortcut, buildFitbitShortcutUrl } from "../components/FitbitShortcutCard.jsx";
 
@@ -31,10 +33,12 @@ function Ring({ value, goal, label, sub, color }) {
   );
 }
 
-export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBlock, goTrain }) {
+export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBlock, goTrain, wins, setWins, reviews, openReview }) {
   const today = dkey();
   const [workouts] = usePersisted("workouts", []);
   const [fitbit] = useFitbitShortcut();
+  const [sleep] = usePersisted("sleep", null);
+  const night = lastNight(sleep, today);
   const info = wp.info(today);
   const plan = todayPlan({ info, logged: log[today], fromFitbit: wp.fromFitbit && wp.fromFitbit[wp.todayIdx] });
   const routine = plan.rid ? routineById(plan.rid) : null;
@@ -60,6 +64,7 @@ export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBloc
             <span className="inline-flex items-center gap-1">{info.office ? <Building2 size={13} className="text-warn" /> : <Home size={13} />}{info.office ? "Oficina" : "Casa"}</span>
             {plan.state === "planned" && plan.evening && <span className="inline-flex items-center gap-1"><Moon size={13} className="text-cool" />Entreno de noche</span>}
             {plan.state === "planned" && !plan.evening && <span>Despertar {info.wake}</span>}
+            {night && <span className={isPoorSleep(night) ? "text-warn" : ""}>Dormiste {fmtSleep(night.min)}</span>}
           </div>
 
           {plan.state === "rest" ? (
@@ -74,6 +79,14 @@ export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBloc
             <>
               <h2 className="font-display text-2xl font-semibold uppercase leading-tight">{routine.name}</h2>
               <p className="mt-0.5 text-sm text-muted">{routine.short} · ~{routine.minutes} min · {routine.focus}</p>
+              {plan.state === "planned" && isPoorSleep(night) && (
+                <div className="mt-3 rounded-xl border border-warn/40 bg-warn/10 p-3 text-sm">
+                  <p><span className="font-semibold text-warn">Dormiste {fmtSleep(night.min)}.</span> Con poco sueño rinde más una sesión liviana: haz la suave de 20 min o quita una serie por ejercicio.</p>
+                  <button onClick={() => goTrain("low")} className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-warn/50 bg-surface2 px-3.5 py-2 text-sm font-semibold text-warn hover:bg-warn/15">
+                    <BatteryLow size={16} />Cambiar a sesión suave
+                  </button>
+                </div>
+              )}
               {plan.state === "done" && (
                 <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-good"><Check size={16} />Hecha hoy</p>
               )}
@@ -119,6 +132,7 @@ export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBloc
 
       <aside className="grid min-w-0 content-start gap-4 md:grid-cols-2 xl:grid-cols-1">
         <IdentityCard wp={wp} log={log} habits={habits} habitDefs={habitDefs} />
+        <ReviewCard wins={wins} setWins={setWins} reviews={reviews} onOpenReview={openReview} />
         <BlockCard block={block} setBlock={setBlock} />
         <section className="rounded-2xl border border-line bg-surface p-4">
           <h2 className="mb-2 font-display text-lg font-semibold uppercase tracking-wide">Hábitos de hoy</h2>

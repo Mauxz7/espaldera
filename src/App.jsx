@@ -11,6 +11,7 @@ import { RestTimer } from "./components/RestTimer.jsx";
 import { WarmupSheet } from "./components/WarmupSheet.jsx";
 import { TrainView } from "./views/TrainView.jsx";
 import { HomeView } from "./views/HomeView.jsx";
+import { ReviewView } from "./views/ReviewView.jsx";
 import { DashboardView } from "./views/DashboardView.jsx";
 import { HabitsView } from "./views/HabitsView.jsx";
 import { useHabitReminders, ReminderBanner, ReminderCard, resolveCompletedValue } from "./lib/reminder.jsx";
@@ -25,9 +26,10 @@ export const TABS = [
 ];
 
 export default function App() {
-  // Siempre abre en Inicio, salvo que se haya cerrado a mitad de un entreno hace menos de 2 horas.
+  // Siempre abre en Inicio, salvo ?ver=revision o si se cerró a mitad de un entreno hace menos de 2 horas.
   const [tab, setTab] = useState(() => {
     try {
+      if (new URLSearchParams(window.location.search).get("ver") === "revision") return "review";
       const last = localStorage.getItem("fitpanel:tab");
       const at = Number(localStorage.getItem("fitpanel:tabAt")) || 0;
       return last === "train" && Date.now() - at < 2 * 3600000 ? "train" : "home";
@@ -35,6 +37,8 @@ export default function App() {
   });
   const [trainRid, setTrainRid] = useState(null);
   const goTrain = useCallback((rid) => { setTrainRid(rid || null); setTab("train"); window.scrollTo(0, 0); }, []);
+  const openReview = useCallback(() => { setTab("review"); window.scrollTo(0, 0); }, []);
+  const goHome = useCallback(() => { setTab("home"); window.scrollTo(0, 0); }, []);
   const [sets, setSets] = usePersisted("sets", {});
   const [log, setLog] = usePersisted("log", {});
   const [habits, setHabits] = usePersisted("habits", {});
@@ -44,6 +48,8 @@ export default function App() {
   const [swaps, setSwaps] = usePersisted("swaps", {});
   const [loads, setLoads] = usePersisted("loads", {});
   const [lastLoads, setLastLoads] = usePersisted("lastLoads", {});
+  const [wins, setWins] = usePersisted("wins", []);
+  const [reviews, setReviews] = usePersisted("reviews", {});
   const wp = useWeekPlan(log);
   useCalendarSync(wp.upcoming); // plan → cal/plan.json → calendario «Shift» (repo privado)
   const [timer, setTimer] = useState(null);
@@ -59,6 +65,31 @@ export default function App() {
   // El navegador solo deja sonar audio después de un toque: se desbloquea con el primero.
   useEffect(() => { window.addEventListener("pointerdown", unlockAudio); return () => window.removeEventListener("pointerdown", unlockAudio); }, []);
   const startTimer = useCallback((sec) => { unlockAudio(); setTimer({ endAt: Date.now() + sec * 1000, duration: sec * 1000 }); }, []);
+
+  // Limpia ?ver=revision tras abrir la vista y escucha mensajes del service worker al tocar un aviso.
+  useEffect(() => {
+    try {
+      const u = new URL(window.location.href);
+      if (u.searchParams.get("ver") === "revision") {
+        u.searchParams.delete("ver");
+        window.history.replaceState(null, "", `${u.pathname}${u.search}${u.hash}`);
+      }
+    } catch (e) {}
+    if (!("serviceWorker" in navigator)) return;
+    const onMessage = (e) => {
+      const d = e && e.data;
+      if (!d || d.type !== "open" || !d.url) return;
+      try {
+        const target = new URL(d.url, window.location.href);
+        if (target.searchParams.get("ver") === "revision") {
+          setTab("review");
+          window.scrollTo(0, 0);
+        }
+      } catch (err) {}
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, []);
 
   // Sincroniza al abrir, al volver a la app y cada minuto mientras está a la vista.
   useEffect(() => {
@@ -102,7 +133,8 @@ export default function App() {
           <SyncBadge />
         </header>
         <div className="mx-auto max-w-6xl">
-          {tab === "home" && <HomeView wp={wp} log={log} habits={habits} setHabits={setHabits} habitDefs={habitDefs} block={block} setBlock={setBlock} goTrain={goTrain} />}
+          {tab === "home" && <HomeView wp={wp} log={log} habits={habits} setHabits={setHabits} habitDefs={habitDefs} block={block} setBlock={setBlock} goTrain={goTrain} wins={wins} setWins={setWins} reviews={reviews} openReview={openReview} />}
+          {tab === "review" && <ReviewView wp={wp} log={log} habits={habits} habitDefs={habitDefs} wins={wins} setWins={setWins} reviews={reviews} setReviews={setReviews} onBack={goHome} />}
           {tab === "train" && <TrainView key={trainRid || "auto"} initialRid={trainRid} sets={sets} setSets={setSets} log={log} setLog={setLog} block={block} swaps={swaps} setSwaps={setSwaps} loads={loads} setLoads={setLoads} lastLoads={lastLoads} setLastLoads={setLastLoads} startTimer={startTimer} openWarmup={() => setWarmup(true)} wp={wp} />}
           {tab === "fitbit" && <DashboardView health={health} setHealth={setHealth} log={log} />}
           {tab === "settings" && <SettingsView habitDefs={habitDefs} setHabitDefs={setHabitDefs} reminderCard={<ReminderCard rem={rem} />} />}

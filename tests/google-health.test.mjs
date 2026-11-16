@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { toWorkout, sinceDate, main } from "../scripts/google-health.mjs";
+import { toWorkout, sinceDate, main, toSleep, applySleep } from "../scripts/google-health.mjs";
 
 // Forma tomada del ejemplo oficial de la Google Health API.
 const walk = {
@@ -70,7 +70,7 @@ test("main pagina, fusiona en data.json sin tocar otras claves y no duplica", as
   const f = fakeFetch({ pages: [[walk], [lift]] });
   const res = await main({ root, now, env, fetchImpl: f });
   assert.deepEqual([res.points, res.added, res.total], [2, 2, 2]);
-  const api = f.calls.filter((c) => c.url.includes("health.googleapis.com"));
+  const api = f.calls.filter((c) => c.url.includes("/dataTypes/exercise/"));
   assert.equal(api.length, 2);
   assert.equal(api[0].opts.headers.Authorization, "Bearer acc");
   assert.match(new URL(api[0].url).searchParams.get("filter"), /^exercise\.interval\.civil_start_time >= "2026-09-13"$/);
@@ -85,4 +85,66 @@ test("main explica cómo reautorizar si Google rechaza el token, y sale tranquil
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "espaldera-gh-"));
   await assert.rejects(main({ root, env, fetchImpl: fakeFetch({ tokenOk: false }) }), /google-health-auth\.mjs/);
   assert.deepEqual(await main({ root, env: {} }), { skipped: true });
+});
+
+const night = (o = {}) => ({
+  sleep: {
+    interval: {
+      startTime: "2026-11-15T04:40:00Z", endTime: "2026-11-15T12:10:00Z", startUtcOffset: "-21600s", endUtcOffset: "-21600s",
+      civilStartTime: { date: { year: 2026, month: 11, day: 14 }, time: { hours: 22, minutes: 40 } },
+      civilEndTime: { date: { year: 2026, month: 11, day: 15 }, time: { hours: 6, minutes: 10 } },
+    },
+    summary: { minutesAsleep: "418" },
+    metadata: { mainSleep: true },
+    ...o,
+  },
+});
+
+test("toSleep usa el día en que despertaste, la hora civil y descarta siestas", () => {
+  assert.deepEqual(toSleep(night()), { date: "2026-11-15", min: 418, bed: "22:40", wake: "06:10" });
+  assert.equal(toSleep(night({ metadata: { nap: true } })), null);
+  assert.equal(toSleep({ exercise: {} }), null);
+  const noCivil = night();
+  delete noCivil.sleep.interval.civilStartTime;
+  delete noCivil.sleep.interval.civilEndTime;
+  assert.deepEqual(toSleep(noCivil), { date: "2026-11-15", min: 418, bed: "22:40", wake: "06:10" });
+});
+
+test("applySleep guarda la noche más larga por día, poda a 60 días y solo reescribe data.json si cambió", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "espaldera-sl-"));
+  fs.writeFileSync(path.join(root, "data.json"), JSON.stringify({ habits: { v: {}, at: 1 } }));
+  const now = new Date("2026-11-16T12:00:00Z");
+  const r = applySleep({ root, now, incoming: [
+    { date: "2026-11-15", min: 300, bed: "01:00", wake: "06:00" },
+    { date: "2026-11-15", min: 418, bed: "22:40", wake: "06:10" },
+    { date: "2026-08-01", min: 400, bed: "22:00", wake: "05:00" },
+  ] });
+  assert.deepEqual(r, { nights: 1, changed: true });
+  const data = JSON.parse(fs.readFileSync(path.join(root, "data.json"), "utf8"));
+  assert.deepEqual(data.sleep.v, { "2026-11-15": { min: 418, bed: "22:40", wake: "06:10" } });
+  assert.deepEqual(data.habits, { v: {}, at: 1 });
+  assert.equal(applySleep({ root, now: new Date("2026-11-16T13:00:00Z"), incoming: [] }).changed, false);
+});
+
+test("main sigue con los entrenos si Google niega el permiso de sueño", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "espaldera-gh-"));
+  const base = fakeFetch({ pages: [[walk]] });
+  const f = async (url, opts) => (url.includes("/dataTypes/sleep/")
+    ? { ok: false, status: 403, text: async () => "PERMISSION_DENIED" }
+    : base(url, opts));
+  const res = await main({ root, now: new Date("2026-11-12T20:00:00Z"), env, fetchImpl: f });
+  assert.equal(res.added, 1);
+  assert.equal(res.sleep, null);
+});
+
+test("main guarda el sueño en data.json", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "espaldera-gh-"));
+  const base = fakeFetch({ pages: [[walk]] });
+  const f = async (url, opts) => (url.includes("/dataTypes/sleep/")
+    ? { ok: true, json: async () => ({ dataPoints: [night()] }) }
+    : base(url, opts));
+  const res = await main({ root, now: new Date("2026-11-16T12:00:00Z"), env, fetchImpl: f });
+  assert.deepEqual(res.sleep, { nights: 1, changed: true });
+  const data = JSON.parse(fs.readFileSync(path.join(root, "data.json"), "utf8"));
+  assert.equal(data.sleep.v["2026-11-15"].min, 418);
 });

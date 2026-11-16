@@ -233,7 +233,7 @@ export function buildWeeklySummary(data = {}, now = new Date(), tz = TZ) {
 
   return {
     tag: "espaldera-resumen",
-    url: APP_URL,
+    url: `${APP_URL}?ver=revision`,
     title: "Resumen semanal",
     body: lines.join("\n"),
     lines,

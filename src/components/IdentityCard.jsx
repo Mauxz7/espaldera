@@ -2,15 +2,19 @@ import { useMemo } from "react";
 import { Vote } from "lucide-react";
 import { usePersisted } from "../lib/storage.js";
 import { DEFAULT_IDENTITIES } from "../data/identities.js";
+import { DEFAULT_DOPAMINE_DEFS } from "../data/dopamine.js";
 import { weekVotes, topIdentity, votesPhrase } from "../lib/identity.js";
 
 // Tarjeta de Inicio: votos de la semana por identidad (barras horizontales)
 // y la frase de la identidad con más votos.
 export function IdentityCard({ wp, log, habits, habitDefs }) {
   const [identities] = usePersisted("identities", DEFAULT_IDENTITIES);
+  const [dopamine] = usePersisted("dopamine", {});
+  const [dopamineDefs] = usePersisted("dopamineDefs", DEFAULT_DOPAMINE_DEFS);
+  const [sleep] = usePersisted("sleep", null);
   const rows = useMemo(
-    () => weekVotes({ keys: wp.keys, todayIdx: wp.todayIdx, habits, habitDefs, identities, log, fromFitbit: wp.fromFitbit }),
-    [wp.keys, wp.todayIdx, habits, habitDefs, identities, log, wp.fromFitbit],
+    () => weekVotes({ keys: wp.keys, todayIdx: wp.todayIdx, habits, habitDefs, identities, log, fromFitbit: wp.fromFitbit, dopamine, dopamineDefs, sleep }),
+    [wp.keys, wp.todayIdx, habits, habitDefs, identities, log, wp.fromFitbit, dopamine, dopamineDefs, sleep],
   );
   const top = topIdentity(rows);
   const max = Math.max(1, ...rows.map((r) => r.votes));
@@ -49,7 +53,7 @@ export function IdentityCard({ wp, log, habits, habitDefs }) {
           ))}
         </ul>
       )}
-      <p className="mt-3 text-[11px] text-muted">Cada hábito cumplido y cada sesión (en Shift o con Fitbit) es un voto.</p>
+      <p className="mt-3 text-[11px] text-muted">Cada hábito cumplido, cada sesión (en Shift o con Fitbit) y cada día con dopamina buena y cada noche de buen sueño (Fitbit) es un voto.</p>
     </section>
   );
 }

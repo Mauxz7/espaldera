@@ -64,3 +64,25 @@ test("una clave inválida se reporta como error 401", async () => {
   assert.equal(st.state, "error");
   assert.equal(st.code, 401);
 });
+
+test("dopamineDefs y dopamine se sincronizan entre dispositivos", async () => {
+  const a = await device("f");
+  const b = await device("g");
+  await a.write("dopamineDefs", [{ id: "d_read", label: "Leer", kind: "good", identity: "lector" }], 3000);
+  await a.write("dopamine", { "2026-11-15": { d_read: 2 } }, 3000);
+  await a.sync();
+  await b.sync();
+  assert.deepEqual(await b.read("dopamineDefs"), [{ id: "d_read", label: "Leer", kind: "good", identity: "lector" }]);
+  assert.deepEqual(await b.read("dopamine"), { "2026-11-15": { d_read: 2 } });
+});
+
+test("wins y reviews se sincronizan entre dispositivos", async () => {
+  const a = await device("h");
+  const b = await device("i");
+  await a.write("wins", [{ id: "win_1", date: "2026-11-16", text: "Primer logro" }], 4000);
+  await a.write("reviews", { "2026-11-16": { good: "Buen inicio", adjust: "Dormir antes", at: 4000 } }, 4000);
+  await a.sync();
+  await b.sync();
+  assert.deepEqual(await b.read("wins"), [{ id: "win_1", date: "2026-11-16", text: "Primer logro" }]);
+  assert.deepEqual(await b.read("reviews"), { "2026-11-16": { good: "Buen inicio", adjust: "Dormir antes", at: 4000 } });
+});

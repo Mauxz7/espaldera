@@ -5,6 +5,7 @@ import { DEFAULT_HABIT_DEFS, reqDone, isHabitDoneOrMini, getHabitIcon } from "..
 import { computeAllHabitStats } from "../lib/habitStats.js";
 import { Chip } from "../components/ui.jsx";
 import { HabitsMini } from "../components/Habits.jsx";
+import { DopamineCard } from "../components/DopamineCard.jsx";
 
 export const NIGHT = [
   { t: "9:30 p.m.", h: "Antes de salir de la U", d: "Luz del celular al mínimo y modo noche activo. Decide hoy la rutina de mañana (la app te la sugiere)." },
@@ -110,6 +111,8 @@ export function HabitsView({ habits, setHabits, habitDefs, tomorrow, tonight }) 
           </ol>
         </section>
       </div>
+
+      <DopamineCard />
 
       <section className="rounded-2xl border border-line bg-surface p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

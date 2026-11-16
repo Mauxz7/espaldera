@@ -116,3 +116,34 @@ test("weekVotes cuenta hábitos marcados en versión de 2 minutos (_mini)", () =
   assert.equal(rows.find((x) => x.id === "lector").votes, 2);
   assert.equal(rows.find((x) => x.id === "atleta").votes, 1);
 });
+
+test("weekVotes suma 1 voto por día con dopamina buena (no por toque) e ignora la barata", () => {
+  const defs = [
+    { id: "d_social", label: "Redes", kind: "cheap", limit: 2, identity: "descanso" }, // barato: nunca vota aunque tenga identity
+    { id: "d_read", label: "Leer", kind: "good", identity: "lector" },
+    { id: "d_study", label: "Estudiar", kind: "good", identity: "estudiante" },
+    { id: "d_none", label: "Sin identidad", kind: "good", identity: null },
+  ];
+  const dopamine = {
+    "2026-11-02": { d_read: 2 }, // semana anterior: no cuenta
+    "2026-11-09": { d_read: 4, d_social: 3, d_none: 2 }, // lunes: 4 toques de d_read = 1 voto lector
+    "2026-11-10": { d_read: 1, d_study: 3 }, // martes: 1 voto lector, 1 voto estudiante
+    "2026-11-12": { d_study: 5 }, // jueves (después de todayIdx 2): no cuenta
+  };
+  const rows = weekVotes({
+    keys,
+    todayIdx: 2,
+    habits: {},
+    habitDefs: [],
+    identities: DEFAULT_IDENTITIES,
+    dopamine,
+    dopamineDefs: defs,
+  });
+  const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
+  assert.equal(byId.lector.votes, 2);
+  assert.equal(byId.lector.days, 2);
+  assert.equal(byId.estudiante.votes, 1);
+  assert.equal(byId.estudiante.days, 1);
+  assert.equal(byId.descanso.votes, 0);
+  assert.equal(byId.atleta.votes, 0);
+});
