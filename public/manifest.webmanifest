@@ -1,7 +1,7 @@
 {
-  "name": "Espaldera",
-  "short_name": "Espaldera",
-  "description": "Centro de entrenamiento y hábitos.",
+  "name": "Shift",
+  "short_name": "Shift",
+  "description": "Hábitos, entreno e identidad.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",

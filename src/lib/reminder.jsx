@@ -96,14 +96,14 @@ export function buildNotificationPayload(dueHabits = [], now = new Date()) {
     if (hb.id === CREATINE_ID) {
       return {
         title: "Creatina pendiente",
-        body: `Son las ${hhmm(now)} y aún no la marcas. Tómala y toca el check en Espaldera.`,
+        body: `Son las ${hhmm(now)} y aún no la marcas. Tómala y toca el check en Shift.`,
         tabTitle: "⏰ Creatina pendiente",
         tag: "espaldera-recordatorio",
       };
     }
     return {
       title: `Hábito pendiente: ${clean}`,
-      body: `Son las ${hhmm(now)} y aún no marcas «${clean}». Hazlo y márcalo en Espaldera.`,
+      body: `Son las ${hhmm(now)} y aún no marcas «${clean}». Hazlo y márcalo en Shift.`,
       tabTitle: `⏰ ${clean}`,
       tag: "espaldera-recordatorio",
     };
@@ -119,7 +119,7 @@ export function buildNotificationPayload(dueHabits = [], now = new Date()) {
   }
   return {
     title: "Recordatorio de hábitos",
-    body: `Son las ${hhmm(now)}. Así te avisará Espaldera cuando tengas hábitos pendientes.`,
+    body: `Son las ${hhmm(now)}. Así te avisará Shift cuando tengas hábitos pendientes.`,
     tabTitle: "⏰ Recordatorio de hábitos",
     tag: "espaldera-recordatorio",
   };
@@ -429,7 +429,7 @@ export function ReminderCard({ rem, taken }) {
     <section className="rounded-2xl border border-line bg-surface p-4">
       <h2 className="mb-1 font-display text-lg font-semibold uppercase tracking-wide">Recordatorios de hábitos</h2>
       <p className="text-sm text-muted">
-        A partir de la hora configurada en cada hábito, si sigue pendiente, Espaldera te avisa cada hora en punto con notificación, sonido y aviso en pantalla. Se detiene apenas lo marcas.
+        A partir de la hora configurada en cada hábito, si sigue pendiente, Shift te avisa cada hora en punto con notificación, sonido y aviso en pantalla. Se detiene apenas lo marcas.
       </p>
       <div className={`mt-3 flex items-start gap-2 text-xs ${permText.cls}`}>
         <Icon size={14} className="mt-0.5 shrink-0" />
@@ -454,7 +454,7 @@ export function ReminderCard({ rem, taken }) {
         </button>
       </div>
       <p className="mt-2 text-[11px] text-muted">
-        Hoy: {statusText} Funciona mientras Espaldera esté abierta en alguna pestaña.
+        Hoy: {statusText} Funciona mientras Shift esté abierta en alguna pestaña.
       </p>
     </section>
   );

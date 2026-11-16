@@ -4,7 +4,7 @@ import { DEFAULT_HABIT_DEFS, reqDone } from "../data/habits.js";
 import { dkey } from "./dates.js";
 
 // Progreso de la semana en curso (lunes a hoy) para los tres anillos de Inicio.
-// - sesiones: rutinas principales distintas hechas (en Espaldera o cubiertas por Fitbit) de 4.
+// - sesiones: rutinas principales distintas hechas (en Shift o cubiertas por Fitbit) de 4.
 // - hábitos: días con todos los obligatorios cumplidos, sobre los días transcurridos.
 // - minutos: minutos de entrenos de Fitbit en la semana, contra una meta de 150 (recomendación OMS).
 export const MINUTES_GOAL = 150;

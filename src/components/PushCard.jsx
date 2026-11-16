@@ -5,7 +5,7 @@ import { pushSupported, isStandalone, isIOS, currentSubscription, enablePush, di
 
 const ERRORS = {
   "sin-sync": "Primero conecta la sincronización con GitHub (arriba): el aviso se guarda en tu repositorio privado.",
-  "permiso-denied": "Bloqueaste las notificaciones. Actívalas en Ajustes del sistema → Notificaciones → Espaldera.",
+  "permiso-denied": "Bloqueaste las notificaciones. Actívalas en Ajustes del sistema → Notificaciones → Shift.",
   "permiso-default": "No diste permiso. Vuelve a tocar «Activar» y elige «Permitir».",
   "no-soportado": "Este navegador no ofrece avisos con la app cerrada.",
 };
@@ -42,13 +42,13 @@ export function PushCard() {
     <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">
       <h2 className="mb-1 font-display text-lg font-semibold uppercase tracking-wide">Avisos con la app cerrada</h2>
       <p className="text-sm text-muted">
-        Los hábitos con hora te avisan aunque Espaldera esté cerrada, cada hora hasta que los marques, de 6:00 a.m. a 11:45 p.m. Pueden llegar con unos minutos de retraso. Actívalo en cada dispositivo.
+        Los hábitos con hora te avisan aunque Shift esté cerrada, cada hora hasta que los marques, de 6:00 a.m. a 11:45 p.m. Pueden llegar con unos minutos de retraso. Actívalo en cada dispositivo.
       </p>
 
       {needsInstall ? (
         <div className="mt-3 flex items-start gap-2 rounded-xl bg-surface2 p-3 text-xs text-warn">
           <Smartphone size={15} className="mt-0.5 shrink-0" />
-          <span>En iPhone y iPad solo funciona con la app instalada: en Safari toca Compartir → «Agregar a pantalla de inicio» y abre Espaldera desde ese ícono.</span>
+          <span>En iPhone y iPad solo funciona con la app instalada: en Safari toca Compartir → «Agregar a pantalla de inicio» y abre Shift desde ese ícono.</span>
         </div>
       ) : !supported ? (
         <p className="mt-3 flex items-start gap-2 text-xs text-warn"><BellOff size={14} className="mt-0.5 shrink-0" />{ERRORS["no-soportado"]}</p>

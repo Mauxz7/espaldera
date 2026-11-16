@@ -124,19 +124,19 @@ Depende de U1. Toca `views/TrainView.jsx`, `components/ExerciseCard.jsx` y compo
 
 La app deja de ser solo de entreno: pasa a llamarse **Shift** (hábitos e identidad). Estudio, focus y exámenes siguen en Mana Core (app aparte); Shift no los duplica.
 
-### C1 · Renombrar a Shift
+### ✅ C1 · Renombrar a Shift
 - Nombre visible, `<title>`, manifest (`name`, `short_name`), encabezados y títulos de las notificaciones (`scripts/recordatorios.mjs` y su COPIA en el repo privado).
 - **No** cambiar: el prefijo `fitpanel:` de localStorage, las claves de `data.json`, la URL ni el nombre del repo (rompería los datos y la app instalada).
 - **Listo cuando:** la app instalada se actualiza sola y muestra «Shift»; `npm test` pasa.
 
-### C2 · Escribir el plan en un calendario «Shift» · **Reservada para Claude**
-- La app guarda el plan calculado en la clave sincronizada `calPlan`: `[{ date, rid, title, start "HH:MM", min }]` para esta semana y la siguiente. Se reescribe cuando cambia el plan (reacomodar, marcar oficina/noche, cambiar de bloque).
-- Repo privado: flujo «Calendario» (al hacer push de `data.json` + una vez al día) corre `scripts/calendario.mjs` (COPIA del público). Crea el calendario secundario «Shift» si no existe y hace upsert por fecha usando `extendedProperties.private.shiftKey`; borra los eventos de fechas que ya no tienen sesión. **Solo toca el calendario Shift**, nunca el principal.
+### ✅ C2 · Escribir el plan en un calendario «Shift» · **Hecha por Claude**
+- La app (`lib/calendar.js`, `useCalendarSync`) sube `cal/plan.json` al repo privado con los próximos 14 días (`{ items: [{ date, rid, title, start, min, desc }] }`) **solo cuando cambia** y después de sincronizar. No va en `data.json` para que la tarea no corra en cada sincronización (minutos gratis de Actions).
+- Repo privado: flujo «Calendario» (al cambiar `cal/plan.json` + 5:41 a.m./p.m.) corre `scripts/calendario.mjs` (COPIA del público). El id del calendario vive en `cal/state.json`. Crea el calendario secundario «Shift» si no existe y hace upsert por fecha usando `extendedProperties.private.shiftKey`; borra los eventos de fechas que ya no tienen sesión. **Solo toca el calendario Shift**, nunca el principal.
 - Título tipo «🏋️ Día 2 · Pierna & Core», descripción con los ejercicios, duración = minutos de la rutina.
-- Permisos mínimos: `calendar.app.created` (crear y editar solo calendarios hechos por la app) + `calendar.events.readonly` (C3). Se añaden al `SCOPE` de `scripts/google-health-auth.mjs`; el usuario activa la Calendar API en su proyecto de Google Cloud y vuelve a correr el script.
+- Permisos mínimos: `calendar.app.created` (crear y editar solo calendarios hechos por la app) + `calendar.events.readonly` (C3), en un **token aparte** (`GOOGLE_CALENDAR_REFRESH_TOKEN`, con `GOOGLE_CLIENT_ID/SECRET`): la Google Health API rechaza tokens con otros permisos. `scripts/google-health-auth.mjs` pide los dos en una corrida (`--solo-calendario` / `--solo-fitbit`). En modo Testing ambos vencen a los 7 días.
 - **Listo cuando:** reacomodar la semana en el teléfono cambia los eventos en Google Calendar en menos de ~2 min.
 
-### C3 · Leer el calendario para llenar la semana · **Reservada para Claude**
+### ✅ C3 · Leer el calendario para llenar la semana · **Hecha por Claude**
 - El selector manual de oficina/casa/noche de la app es la fuente de verdad: el horario base del calendario cambia seguido y no siempre se actualiza. El calendario solo **sugiere**.
 - El mismo flujo lee el calendario principal (14 días) y escribe la clave `calBusy`: `{ "YYYY-MM-DD": { nightBusy, exam } }`. Oficina/casa **no** se lee del calendario.
   - `nightBusy`: un evento ocupado (no transparente) que cruza 18:30–21:00. Se ignoran los eventos que empiezan con «🏋️» (entrenos viejos) y los del calendario Shift.

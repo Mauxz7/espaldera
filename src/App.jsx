@@ -4,6 +4,7 @@ import { Sync, usePersisted } from "./lib/storage.js";
 import { dkey, addDays, pruneDays } from "./lib/dates.js";
 import { CREATINE_ID, DEFAULT_HABIT_DEFS } from "./data/habits.js";
 import { useWeekPlan } from "./lib/planner.js";
+import { useCalendarSync } from "./lib/calendar.js";
 import { unlockAudio } from "./lib/audio.js";
 import { SyncBadge } from "./components/ui.jsx";
 import { RestTimer } from "./components/RestTimer.jsx";
@@ -44,6 +45,7 @@ export default function App() {
   const [loads, setLoads] = usePersisted("loads", {});
   const [lastLoads, setLastLoads] = usePersisted("lastLoads", {});
   const wp = useWeekPlan(log);
+  useCalendarSync(wp.upcoming); // plan → cal/plan.json → calendario «Shift» (repo privado)
   const [timer, setTimer] = useState(null);
   const [warmup, setWarmup] = useState(false);
 
@@ -80,8 +82,8 @@ export default function App() {
     <div className="min-h-full md:flex">
       <nav className="side-nav hidden md:flex md:w-56 md:shrink-0 md:flex-col md:gap-1 md:border-r md:border-line md:p-4 lg:w-64">
         <div className="mb-6 px-2">
-          <div className="font-display text-2xl font-semibold uppercase leading-none">Espaldera</div>
-          <div className="text-xs text-muted">Centro de entrenamiento</div>
+          <div className="font-display text-2xl font-semibold uppercase leading-none">Shift</div>
+          <div className="text-xs text-muted">Hábitos e identidad</div>
         </div>
         {TABS.map((t) => {
           const Icon = t.icon;
@@ -96,7 +98,7 @@ export default function App() {
 
       <main className="page-main min-w-0 flex-1">
         <header className="mb-4 flex items-center justify-between md:hidden">
-          <div className="font-display text-xl font-semibold uppercase">Espaldera</div>
+          <div className="font-display text-xl font-semibold uppercase">Shift</div>
           <SyncBadge />
         </header>
         <div className="mx-auto max-w-6xl">
