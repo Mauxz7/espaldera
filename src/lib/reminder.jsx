@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Check, Bell, BellRing, BellOff } from "lucide-react";
 import { dkey, hhmm } from "./dates.js";
 import { unlockAudio, beep } from "./audio.js";
-import { CREATINE_ID, DEFAULT_HABIT_DEFS, isHabitDone, getHabitIcon } from "../data/habits.js";
+import { CREATINE_ID, DEFAULT_HABIT_DEFS, isHabitDoneOrMini, getHabitIcon } from "../data/habits.js";
 
 export const CREATINE_HOUR = 12;
 export const REMINDER_STORAGE_KEY = "fitpanel:reminderFired";
@@ -48,8 +48,7 @@ export function isHabitDue(def, dayHabits = {}, now = new Date()) {
   if (!def || def.archived) return false;
   const parsed = parseRemindAt(def.remindAt);
   if (!parsed) return false;
-  const val = dayHabits ? dayHabits[def.id] : undefined;
-  if (isHabitDone(def, val)) return false;
+  if (isHabitDoneOrMini(def, dayHabits)) return false;
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   return nowMinutes >= parsed.minutes;
 }
@@ -88,28 +87,42 @@ export function cleanHabitLabel(label) {
   return label.trim().replace(/\.+$/, "") || "Hábito";
 }
 
+export function formatAfterAnchor(after) {
+  const s = typeof after === "string" ? after.trim().replace(/\.+$/, "") : "";
+  if (!s) return "";
+  const rest = s.replace(/^despu[eé]s\s+de\s+/i, "").trim();
+  return rest ? `Después de ${rest}` : s;
+}
+
 export function buildNotificationPayload(dueHabits = [], now = new Date()) {
   const list = Array.isArray(dueHabits) ? dueHabits : [];
   if (list.length === 1) {
     const hb = list[0];
     const clean = cleanHabitLabel(hb.label);
+    const anchor = formatAfterAnchor(hb.after);
+    const prefix = anchor ? `${anchor}: ` : "";
     if (hb.id === CREATINE_ID) {
       return {
         title: "Creatina pendiente",
-        body: `Son las ${hhmm(now)} y aún no la marcas. Tómala y toca el check en Shift.`,
+        body: `${prefix}Son las ${hhmm(now)} y aún no la marcas. Tómala y toca el check en Shift.`,
         tabTitle: "⏰ Creatina pendiente",
         tag: "espaldera-recordatorio",
       };
     }
     return {
       title: `Hábito pendiente: ${clean}`,
-      body: `Son las ${hhmm(now)} y aún no marcas «${clean}». Hazlo y márcalo en Shift.`,
+      body: `${prefix}Son las ${hhmm(now)} y aún no marcas «${clean}». Hazlo y márcalo en Shift.`,
       tabTitle: `⏰ ${clean}`,
       tag: "espaldera-recordatorio",
     };
   }
   if (list.length > 1) {
-    const names = list.map((h) => cleanHabitLabel(h.label)).join(", ");
+    const names = list
+      .map((h) => {
+        const a = formatAfterAnchor(h.after);
+        return a ? `${a}: ${cleanHabitLabel(h.label)}` : cleanHabitLabel(h.label);
+      })
+      .join(", ");
     return {
       title: `${list.length} hábitos pendientes`,
       body: `Son las ${hhmm(now)}. Pendientes: ${names}.`,
@@ -161,7 +174,7 @@ export function useHabitReminders(habitDefsOrTaken = DEFAULT_HABIT_DEFS, habitsI
   const due = dueHabits.length > 0;
   const dueKey = dueHabits.map((d) => `${d.id}:${d.remindAt || ""}`).join(",");
   const allScheduledDone =
-    scheduledHabits.length > 0 && scheduledHabits.every((d) => isHabitDone(d, dayHabits[d.id]));
+    scheduledHabits.length > 0 && scheduledHabits.every((d) => isHabitDoneOrMini(d, dayHabits));
 
   const dueHabitsRef = useRef(dueHabits);
   dueHabitsRef.current = dueHabits;
@@ -347,6 +360,9 @@ export function ReminderBanner({ rem, onTake }) {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium text-fg">{hb.label}</div>
+                    {hb.after && hb.after.trim() && (
+                      <div className="truncate text-xs text-muted">{hb.after.trim()}</div>
+                    )}
                     <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] text-muted">
                       {hb.remindAt && (
                         <span className="inline-flex items-center gap-0.5">
@@ -367,7 +383,7 @@ export function ReminderBanner({ rem, onTake }) {
                   type="button"
                   onClick={() => onTake && onTake(hb.id)}
                   aria-label={`Marcar ${hb.label}`}
-                  className="inline-flex shrink-0 items-center justify-center gap-1 rounded-xl bg-good px-3 py-1.5 text-xs font-semibold text-bg active:scale-95"
+                  className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1 rounded-xl bg-good px-3 py-1.5 text-xs font-semibold text-bg active:scale-95"
                 >
                   <Check size={14} strokeWidth={3} />
                   Marcar
@@ -418,7 +434,7 @@ export function ReminderCard({ rem, taken }) {
         : `${dueHabits.length} hábitos pendientes, avisos activos.`;
   } else if (scheduled.length > 0) {
     const pending = scheduled
-      .filter((d) => !isHabitDone(d, dayHabits[d.id]))
+      .filter((d) => !isHabitDoneOrMini(d, dayHabits))
       .sort((a, b) => (parseRemindAt(a.remindAt)?.minutes || 0) - (parseRemindAt(b.remindAt)?.minutes || 0));
     if (pending.length > 0) {
       statusText = `próximo aviso a las ${pending[0].remindAt}.`;

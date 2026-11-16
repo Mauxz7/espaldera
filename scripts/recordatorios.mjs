@@ -61,11 +61,17 @@ export function isHabitDone(def, val) {
   return Boolean(val);
 }
 
+export function isHabitDoneOrMini(def, dayMap) {
+  if (!def || !dayMap || typeof dayMap !== "object") return false;
+  if (isHabitDone(def, dayMap[def.id])) return true;
+  return Boolean(dayMap._mini && dayMap._mini[def.id]);
+}
+
 export function dueHabits(defs, dayHabits, parts) {
   return (Array.isArray(defs) && defs.length ? defs : FALLBACK_DEFS).filter((d) => {
     if (!d || d.archived) return false;
     const at = parseRemindAt(d.remindAt);
-    return at !== null && parts.minutes >= at && !isHabitDone(d, (dayHabits || {})[d.id]);
+    return at !== null && parts.minutes >= at && !isHabitDoneOrMini(d, dayHabits);
   });
 }
 
@@ -84,14 +90,47 @@ export function planSend(due, sent, parts) {
 const clean = (s) => (typeof s === "string" ? s.trim().replace(/\.+$/, "") : "") || "Hábito";
 const hhmm = (p) => `${p.hour % 12 || 12}:${String(p.minute).padStart(2, "0")} ${p.hour < 12 ? "a.m." : "p.m."}`;
 
-export function buildPayload(due, parts) {
+export function formatAfterAnchor(after) {
+  const s = typeof after === "string" ? after.trim().replace(/\.+$/, "") : "";
+  if (!s) return "";
+  const rest = s.replace(/^despu[eé]s\s+de\s+/i, "").trim();
+  return rest ? `Después de ${rest}` : s;
+}
+
+export function getMissedYesterdayIds(defs, habits = {}, todayKey) {
+  const list = Array.isArray(defs) && defs.length ? defs : FALLBACK_DEFS;
+  const safeHabits = habits && typeof habits === "object" ? habits : {};
+  const hasPriorHistory = Object.keys(safeHabits).some((k) => /^\d{4}-\d{2}-\d{2}$/.test(k) && k < todayKey);
+  if (!hasPriorHistory) return [];
+  const yesterdayKey = shiftDateKey(todayKey, -1);
+  const yesterday = safeHabits[yesterdayKey];
+  const today = safeHabits[todayKey];
+  return list
+    .filter((d) => d && !d.archived && (!d.group || d.group === "req"))
+    .filter((d) => !isHabitDoneOrMini(d, today) && !isHabitDoneOrMini(d, yesterday))
+    .map((d) => d.id);
+}
+
+export function buildPayload(due, parts, missedIds = []) {
   const base = { tag: "espaldera-recordatorio", url: APP_URL };
+  const missedSet = new Set(Array.isArray(missedIds) ? missedIds : []);
   if (due.length === 1) {
-    const name = clean(due[0].label);
-    if (due[0].id === "o_creatine") return { ...base, title: "Creatina pendiente", body: `Son las ${hhmm(parts)} y aún no la marcas. Tómala y márcala en Espaldera.` };
-    return { ...base, title: `Hábito pendiente: ${name}`, body: `Son las ${hhmm(parts)} y aún no marcas «${name}».` };
+    const d = due[0];
+    const name = clean(d.label);
+    const anchor = formatAfterAnchor(d.after);
+    const prefix = anchor ? `${anchor}: ` : "";
+    const repeatWarn = missedSet.has(d.id) ? " No falles dos veces seguidas." : "";
+    if (d.id === "o_creatine") {
+      return { ...base, title: "Creatina pendiente", body: `${prefix}Son las ${hhmm(parts)} y aún no la marcas. Tómala y márcala en Espaldera.${repeatWarn}` };
+    }
+    return { ...base, title: `Hábito pendiente: ${name}`, body: `${prefix}Son las ${hhmm(parts)} y aún no marcas «${name}».${repeatWarn}` };
   }
-  return { ...base, title: `${due.length} hábitos pendientes`, body: `Son las ${hhmm(parts)}. Pendientes: ${due.map((d) => clean(d.label)).join(", ")}.` };
+  const items = due.map((d) => {
+    const a = formatAfterAnchor(d.after);
+    return a ? `${a}: ${clean(d.label)}` : clean(d.label);
+  }).join(", ");
+  const repeatWarn = due.some((d) => missedSet.has(d.id)) ? " No falles dos veces seguidas." : "";
+  return { ...base, title: `${due.length} hábitos pendientes`, body: `Son las ${hhmm(parts)}. Pendientes: ${items}.${repeatWarn}` };
 }
 
 export function buildNoticePayload(title, body = "") {
@@ -124,7 +163,7 @@ export function computeRequiredHabitStats(defs, habits = {}, today = new Date(),
     if (reqDefs.length === 0) return false;
     const dayData = safeHabits[dateKey];
     if (!dayData || typeof dayData !== "object") return false;
-    return reqDefs.every((def) => isHabitDone(def, dayData[def.id]));
+    return reqDefs.every((def) => isHabitDoneOrMini(def, dayData));
   };
 
   let daysDone = 0;
@@ -316,11 +355,13 @@ export async function main(opts = {}) {
     payload = { tag: "espaldera-prueba", url: APP_URL, title: "Prueba de Shift", body: "Si ves esto, los avisos con la app cerrada funcionan en este dispositivo." };
   } else {
     const defs = data.habitDefs && Array.isArray(data.habitDefs.v) ? data.habitDefs.v : FALLBACK_DEFS;
-    const day = (data.habits && data.habits.v && data.habits.v[parts.date]) || {};
+    const allHabits = (data.habits && data.habits.v) || {};
+    const day = allHabits[parts.date] || {};
     const due = dueHabits(defs, day, parts);
     const plan = planSend(due, state.sent, parts);
     if (!plan.send) { console.log(`${parts.date} ${parts.hour}:${String(parts.minute).padStart(2, "0")} · pendientes: ${due.length} · sin aviso nuevo`); return { sent: 0 }; }
-    payload = buildPayload(due, parts);
+    const missedIds = getMissedYesterdayIds(defs, allHabits, parts.date);
+    payload = buildPayload(due, parts, missedIds);
     nextSent = plan.nextSent;
   }
 
