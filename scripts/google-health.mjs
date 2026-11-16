@@ -7,6 +7,7 @@
 // Doc: GET https://health.googleapis.com/v4/users/me/dataTypes/exercise/dataPoints
 //      permiso https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly
 // Sueño (D2): GET …/dataTypes/sleep/dataPoints con permiso googlehealth.sleep.readonly.
+//      El sueño NO acepta filtro por civil_start_time (da 400): se filtra por sleep.interval.civil_end_time.
 //      Si el token es anterior y no trae ese permiso, los entrenos siguen llegando y el registro lo avisa.
 import fs from "node:fs";
 import path from "node:path";
@@ -168,7 +169,7 @@ export async function fetchSleep(fetchImpl, token, since) {
   const out = [];
   let pageToken = "";
   for (let i = 0; i < 20; i++) {
-    const q = new URLSearchParams({ pageSize: "25", filter: `sleep.interval.civil_start_time >= "${since}"` });
+    const q = new URLSearchParams({ pageSize: "25", filter: `sleep.interval.civil_end_time >= "${since}"` });
     if (pageToken) q.set("pageToken", pageToken);
     const res = await fetchImpl(`${SLEEP_API}?${q}`, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) {
