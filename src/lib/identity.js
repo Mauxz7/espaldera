@@ -1,6 +1,6 @@
 // Votos por identidad (sin interfaz, con pruebas en tests/identity.test.mjs).
 // Cada hábito cumplido es un voto para la identidad del hábito; cada sesión
-// registrada en `log` es un voto para «Atleta».
+// registrada en `log` (o cubierta por un entreno de Fitbit) es un voto para «Atleta».
 import { DEFAULT_HABIT_DEFS, isHabitDone } from "../data/habits.js";
 import { DEFAULT_IDENTITIES, IDENTITY_COLORS, ATHLETE_ID, habitIdentity } from "../data/identities.js";
 
@@ -27,7 +27,7 @@ export function normalizeIdentities(list) {
 // - keys: las 7 fechas (AAAA-MM-DD) de la semana; todayIdx: índice de hoy (0 = lunes).
 // - votes: hábitos cumplidos + sesiones registradas; days: días con al menos un voto.
 // Los hábitos archivados, sin identidad o con una identidad que ya no existe no votan.
-export function weekVotes({ keys, todayIdx, habits, habitDefs, identities, log }) {
+export function weekVotes({ keys, todayIdx, habits, habitDefs, identities, log, fromFitbit }) {
   const ids = normalizeIdentities(identities);
   const defs = (Array.isArray(habitDefs) ? habitDefs : DEFAULT_HABIT_DEFS).filter((d) => d && d.id && !d.archived);
   const rows = ids.map((it) => ({ id: it.id, label: it.label, emoji: it.emoji, color: it.color, votes: 0, days: 0 }));
@@ -40,7 +40,7 @@ export function weekVotes({ keys, todayIdx, habits, habitDefs, identities, log }
     const add = (id) => { if (byId.has(id)) dayVotes.set(id, (dayVotes.get(id) || 0) + 1); };
     const h = (habits || {})[k] || {};
     defs.forEach((d) => { if (isHabitDone(d, h[d.id])) add(habitIdentity(d)); });
-    if (log && log[k]) add(ATHLETE_ID);
+    if ((log && log[k]) || (fromFitbit && fromFitbit[i])) add(ATHLETE_ID); // sesión hecha en Shift o registrada solo con Fitbit
     dayVotes.forEach((n, id) => { const r = byId.get(id); r.votes += n; r.days += 1; });
   }
   return rows;

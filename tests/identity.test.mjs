@@ -89,3 +89,11 @@ test("normalizeIdentities y newIdentity", () => {
   assert.equal(lastGrapheme("📚😴"), "😴");
   assert.equal(lastGrapheme(""), "");
 });
+
+test("weekVotes: una sesión cubierta solo por Fitbit también vota por Atleta (sin contar doble)", () => {
+  const keys = Array.from({ length: 7 }, (_, i) => `2026-11-${String(16 + i).padStart(2, "0")}`);
+  const rows = weekVotes({ keys, todayIdx: 3, habits: {}, habitDefs: [], identities: undefined, log: { "2026-11-17": { r: "d1" } }, fromFitbit: { 0: "d3", 1: "d1" } });
+  const atleta = rows.find((r) => r.id === "atleta");
+  assert.equal(atleta.votes, 2);
+  assert.equal(atleta.days, 2);
+});

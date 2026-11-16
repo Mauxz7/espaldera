@@ -9,8 +9,8 @@ import { weekVotes, topIdentity, votesPhrase } from "../lib/identity.js";
 export function IdentityCard({ wp, log, habits, habitDefs }) {
   const [identities] = usePersisted("identities", DEFAULT_IDENTITIES);
   const rows = useMemo(
-    () => weekVotes({ keys: wp.keys, todayIdx: wp.todayIdx, habits, habitDefs, identities, log }),
-    [wp.keys, wp.todayIdx, habits, habitDefs, identities, log],
+    () => weekVotes({ keys: wp.keys, todayIdx: wp.todayIdx, habits, habitDefs, identities, log, fromFitbit: wp.fromFitbit }),
+    [wp.keys, wp.todayIdx, habits, habitDefs, identities, log, wp.fromFitbit],
   );
   const top = topIdentity(rows);
   const max = Math.max(1, ...rows.map((r) => r.votes));
@@ -49,7 +49,7 @@ export function IdentityCard({ wp, log, habits, habitDefs }) {
           ))}
         </ul>
       )}
-      <p className="mt-3 text-[11px] text-muted">Cada hábito cumplido y cada sesión registrada es un voto.</p>
+      <p className="mt-3 text-[11px] text-muted">Cada hábito cumplido y cada sesión (en Shift o con Fitbit) es un voto.</p>
     </section>
   );
 }
