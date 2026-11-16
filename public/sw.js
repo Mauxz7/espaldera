@@ -2,7 +2,7 @@
 // __BUILD__ cambia en cada publicación, y eso es lo que dispara la actualización en cada dispositivo.
 const VERSION = "__BUILD__";
 const CACHE = "espaldera-" + VERSION;
-const CORE = ["./", "./index.html", "./app.js", "./app.css", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
+const CORE = ["./", "./index.html", "./app.js", "./app.css", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png", "./apple-touch-icon.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE.map((u) => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting()));
