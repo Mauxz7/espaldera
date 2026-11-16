@@ -6,6 +6,7 @@ import { routineById, BLOCK_WEEKS } from "../data/program.js";
 import { weekProgress, todayPlan } from "../lib/home.js";
 import { WeekCard } from "../components/WeekCard.jsx";
 import { BlockCard } from "../components/BlockCard.jsx";
+import { IdentityCard } from "../components/IdentityCard.jsx";
 import { HabitsMini } from "../components/Habits.jsx";
 import { useFitbitShortcut, buildFitbitShortcutUrl } from "../components/FitbitShortcutCard.jsx";
 
@@ -117,6 +118,7 @@ export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBloc
       </div>
 
       <aside className="grid min-w-0 content-start gap-4 md:grid-cols-2 xl:grid-cols-1">
+        <IdentityCard wp={wp} log={log} habits={habits} habitDefs={habitDefs} />
         <BlockCard block={block} setBlock={setBlock} />
         <section className="rounded-2xl border border-line bg-surface p-4">
           <h2 className="mb-2 font-display text-lg font-semibold uppercase tracking-wide">Hábitos de hoy</h2>

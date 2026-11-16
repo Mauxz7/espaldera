@@ -146,7 +146,7 @@ La app deja de ser solo de entreno: pasa a llamarse **Shift** (hábitos e identi
 
 ## Fase 8 · Identidad
 
-### I1 · Identidades y votos
+### ✅ I1 · Identidades y votos
 - Cuatro identidades iniciales, editables: **Atleta**, **Estudiante de Derecho**, **Lector**, **Persona descansada**. Cada hábito se asigna a una.
 - Cada hábito cumplido = un «voto» para esa identidad. Tarjeta en Inicio con los votos de la semana por identidad (barras o anillos), frase tipo «Esta semana votaste 9 veces por ser Atleta».
 - Puente opcional con Mana Core: minutos de focus del día como votos de Estudiante (ver M1).
