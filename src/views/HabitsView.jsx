@@ -1,7 +1,7 @@
 import { Flame, AlarmClock } from "lucide-react";
 import { dkey, fromKey, addDays, DAYS, DAYS_LONG, clockAm, fmtShort } from "../lib/dates.js";
 import { routineById } from "../data/program.js";
-import { DEFAULT_HABIT_DEFS, reqDone, isHabitDone, getHabitIcon } from "../data/habits.js";
+import { DEFAULT_HABIT_DEFS, reqDone, isHabitDoneOrMini, getHabitIcon } from "../data/habits.js";
 import { computeAllHabitStats } from "../lib/habitStats.js";
 import { Chip } from "../components/ui.jsx";
 import { HabitsMini } from "../components/Habits.jsx";
@@ -89,7 +89,7 @@ export function HabitsView({ habits, setHabits, habitDefs, tomorrow, tonight }) 
                   </div>
                   <div className="mt-1 flex justify-center gap-0.5">
                     {optDefs.map((x) => (
-                      <span key={x.id} className={`h-1.5 w-1.5 rounded-full ${isHabitDone(x, h[x.id]) ? "bg-cool" : "bg-surface2"}`} />
+                      <span key={x.id} className={`h-1.5 w-1.5 rounded-full ${isHabitDoneOrMini(x, h) ? "bg-cool" : "bg-surface2"}`} />
                     ))}
                   </div>
                 </div>
@@ -129,18 +129,29 @@ export function HabitsView({ habits, setHabits, habitDefs, tomorrow, tonight }) 
             const barColor = isOpt ? "bg-cool" : "bg-good";
             const streakTone = hb.currentStreak > 0 ? (isOpt ? "text-cool" : "text-good") : "text-muted";
             return (
-              <div key={hb.id} className="rounded-xl border border-line bg-surface2 p-3">
+              <div key={hb.id} className={`rounded-xl border p-3 ${hb.missedYesterday ? "border-warn/60 bg-warn/10" : "border-line bg-surface2"}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex min-w-0 flex-1 basis-full items-center gap-2 sm:basis-auto">
-                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-surface text-muted">
+                  <div className="flex min-w-0 flex-1 basis-full items-start gap-2 sm:basis-auto">
+                    <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-surface text-muted">
                       <Icon size={13} />
                     </span>
-                    <span className="font-mono text-[10px] text-muted">{hb.code}</span>
-                    <span className="min-w-0 flex-1 text-sm font-medium leading-snug">{hb.label}</span>
+                    <span className="mt-1 font-mono text-[10px] text-muted">{hb.code}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium leading-snug">{hb.label}</div>
+                      {hb.after && hb.after.trim() && (
+                        <div className="text-xs text-muted">{hb.after.trim()}</div>
+                      )}
+                      {hb.missedYesterday && (
+                        <div className="mt-0.5 text-xs font-medium text-warn">Ayer fallaste: hoy no lo dejes pasar</div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2.5 font-mono text-xs tabular-nums">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2 font-mono text-xs tabular-nums">
                     <span className={`inline-flex items-center gap-1 font-semibold ${streakTone}`} title="Racha actual">
                       <Flame size={12} />{hb.currentStreak} {hb.currentStreak === 1 ? "día" : "días"}
+                    </span>
+                    <span className="text-muted" title="Racha sin dos fallos seguidos">
+                      sin 2 fallos: {hb.noTwoMissesStreak}d
                     </span>
                     <span className="text-muted" title="Mejor racha">
                       máx {hb.bestStreak}d
@@ -157,11 +168,17 @@ export function HabitsView({ habits, setHabits, habitDefs, tomorrow, tonight }) 
                 >
                   {hb.days30.map((d, idx) => {
                     const isToday = idx === hb.days30.length - 1;
+                    let cellColor = "bg-surface";
+                    if (d.done) {
+                      cellColor = d.mini
+                        ? (isOpt ? "border border-cool/80 bg-cool/25" : "border border-good/80 bg-good/25")
+                        : barColor;
+                    }
                     return (
                       <span
                         key={d.date}
-                        title={`${fmtShort(d.date)}: ${d.done ? "Cumplido" : "Pendiente"}`}
-                        className={`h-2.5 rounded-[2px] ${d.done ? barColor : "bg-surface"} ${isToday && !d.done ? "ring-1 ring-inset ring-muted/40" : ""}`}
+                        title={`${fmtShort(d.date)}: ${d.mini ? "2 min" : d.done ? "Cumplido" : "Pendiente"}`}
+                        className={`h-2.5 rounded-[2px] ${cellColor} ${isToday && !d.done ? "ring-1 ring-inset ring-muted/40" : ""}`}
                       />
                     );
                   })}
