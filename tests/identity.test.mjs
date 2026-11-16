@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { weekVotes, topIdentity, votesPhrase, normalizeIdentities, newIdentity, firstGrapheme } from "../src/lib/identity.js";
+import { weekVotes, topIdentity, votesPhrase, normalizeIdentities, newIdentity, lastGrapheme } from "../src/lib/identity.js";
 import { DEFAULT_IDENTITIES, DEFAULT_HABIT_IDENTITY, habitIdentity } from "../src/data/identities.js";
 import { DEFAULT_HABIT_DEFS } from "../src/data/habits.js";
 
@@ -85,6 +85,7 @@ test("normalizeIdentities y newIdentity", () => {
   const nu = newIdentity([{ id: "id_a" }], 10);
   assert.equal(nu.id, "id_ax");
   assert.equal(nu.color, "good");
-  assert.equal(firstGrapheme("  ab"), "a");
-  assert.equal(firstGrapheme(""), "");
+  assert.equal(lastGrapheme("ab  "), "b");
+  assert.equal(lastGrapheme("📚😴"), "😴");
+  assert.equal(lastGrapheme(""), "");
 });

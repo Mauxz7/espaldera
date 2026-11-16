@@ -14,9 +14,12 @@ import {
   ChevronUp,
   Bell,
 } from "lucide-react";
-import { DEFAULT_REPO, Sync, useSyncStatus } from "../lib/storage.js";
+import { DEFAULT_REPO, Sync, useSyncStatus, usePersisted } from "../lib/storage.js";
 import { hhmm } from "../lib/dates.js";
 import { DEFAULT_HABIT_DEFS, getHabitIcon } from "../data/habits.js";
+import { DEFAULT_IDENTITIES, habitIdentity } from "../data/identities.js";
+import { normalizeIdentities } from "../lib/identity.js";
+import { IdentityEditor } from "../components/IdentityEditor.jsx";
 import { PushCard } from "../components/PushCard.jsx";
 import { HealthIntakeCard } from "../components/HealthIntakeCard.jsx";
 import { FitbitShortcutCard } from "../components/FitbitShortcutCard.jsx";
@@ -39,6 +42,9 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
   const defs = habitDefs && habitDefs.length ? habitDefs : DEFAULT_HABIT_DEFS;
   const [editingId, setEditingId] = useState(null); // null | "new" | id
   const [showArchived, setShowArchived] = useState(false);
+  const [identities, setIdentities] = usePersisted("identities", DEFAULT_IDENTITIES);
+  const idList = normalizeIdentities(identities);
+  const identityOf = (hb) => idList.find((it) => it.id === habitIdentity(hb)) || null;
   const [form, setForm] = useState({
     label: "",
     group: "req",
@@ -46,6 +52,7 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
     target: 2,
     unit: "",
     remindAt: "",
+    identity: "",
   });
 
   const connect = async () => { if (!token.trim() || !repo.trim()) return; await Sync.connect(token.trim(), repo.trim()); setToken(""); };
@@ -67,6 +74,7 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
       target: 2,
       unit: "",
       remindAt: "",
+      identity: "",
     });
     setEditingId("new");
   };
@@ -79,6 +87,7 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
       target: hb.target || (hb.kind === "count" ? 2 : 1),
       unit: hb.unit || "",
       remindAt: hb.remindAt || "",
+      identity: (identityOf(hb) || {}).id || "",
     });
     setEditingId(hb.id);
   };
@@ -88,6 +97,7 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
     const target = form.kind === "count" ? Math.max(1, parseInt(form.target, 10) || 1) : 1;
     const unit = form.kind === "count" ? (form.unit || "").trim() : "";
     const remindAt = form.remindAt ? form.remindAt.trim() : null;
+    const identity = form.identity || null;
 
     if (editingId === "new") {
       const prefix = form.group === "req" ? "o_" : "f_";
@@ -99,6 +109,7 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
         target,
         unit,
         remindAt,
+        identity,
         archived: false,
       };
       setHabitDefs([...defs, newHabit]);
@@ -113,6 +124,7 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
           target,
           unit,
           remindAt,
+          identity,
         };
       }));
     }
@@ -178,6 +190,9 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
               <span className="inline-flex items-center gap-0.5 font-mono text-muted">
                 <Bell size={10} />{hb.remindAt}
               </span>
+            )}
+            {identityOf(hb) && (
+              <span>{identityOf(hb).emoji ? `${identityOf(hb).emoji} ` : ""}{identityOf(hb).label}</span>
             )}
           </div>
         </div>
@@ -348,6 +363,19 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
               </div>
             )}
 
+            <label className="block text-xs text-muted">Identidad (cada vez que lo cumples es un voto)
+              <select
+                value={form.identity}
+                onChange={(e) => setForm({ ...form, identity: e.target.value })}
+                className="mt-1 h-11 w-full rounded-lg border border-line bg-surface px-3 text-sm text-fg focus:border-accent focus:outline-none"
+              >
+                <option value="">Sin identidad (no vota)</option>
+                {idList.map((it) => (
+                  <option key={it.id} value={it.id}>{it.emoji ? `${it.emoji} ` : ""}{it.label}</option>
+                ))}
+              </select>
+            </label>
+
             <div>
               <div className="flex items-center justify-between">
                 <label className="block text-xs text-muted">Hora de recordatorio (opcional)</label>
@@ -471,6 +499,8 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
           )}
         </div>
       </section>
+
+      <IdentityEditor identities={identities} setIdentities={setIdentities} />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">

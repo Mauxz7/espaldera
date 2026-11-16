@@ -67,12 +67,15 @@ export function newIdentity(identities, now = Date.now()) {
   return { id, label: "Nueva identidad", emoji: "⭐", color: IDENTITY_COLORS[list.length % IDENTITY_COLORS.length] };
 }
 
-// Primer carácter visible (un emoji puede ocupar varios puntos de código).
-export function firstGrapheme(text) {
+// Último carácter visible de lo escrito (un emoji puede ocupar varios puntos de código):
+// así, al escribir sobre el emoji actual, queda el nuevo.
+export function lastGrapheme(text) {
   const s = String(text || "").trim();
   if (!s) return "";
   if (typeof Intl !== "undefined" && Intl.Segmenter) {
-    for (const { segment } of new Intl.Segmenter("es", { granularity: "grapheme" }).segment(s)) return segment;
+    let last = "";
+    for (const { segment } of new Intl.Segmenter("es", { granularity: "grapheme" }).segment(s)) last = segment;
+    return last;
   }
-  return Array.from(s).slice(0, 2).join("");
+  return Array.from(s).slice(-1).join("");
 }
