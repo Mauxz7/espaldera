@@ -163,7 +163,7 @@ El plan se calculaba por semana (lun–dom) y el lunes se planeaba «en blanco»
 
 ## Fase 9 · Dopamina, sueño y revisión
 
-### D1 · Dopamina buena y mala
+### ✅ D1 · Dopamina buena y mala
 - Lista de «dopamina barata» con límite diario (p. ej. redes, videos cortos) que se registra con un toque, y lista de «dopamina buena» (leer, entrenar, caminar, estudiar) que suma votos.
 - Contador del día y de la semana en Hábitos; nada de bloqueo, solo registro honesto.
 
