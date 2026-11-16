@@ -43,14 +43,20 @@ export function isHabitDone(def, val) {
   return Boolean(val);
 }
 
+export function isHabitDoneOrMini(def, dayMap) {
+  if (!def || !dayMap || typeof dayMap !== "object") return false;
+  if (isHabitDone(def, dayMap[def.id])) return true;
+  return Boolean(dayMap._mini && dayMap._mini[def.id]);
+}
+
 export function reqDone(h, defs = DEFAULT_HABIT_DEFS) {
   if (!h || !Array.isArray(defs)) return 0;
-  return defs.filter((d) => (!d.group || d.group === "req") && !d.archived && isHabitDone(d, h[d.id])).length;
+  return defs.filter((d) => (!d.group || d.group === "req") && !d.archived && isHabitDoneOrMini(d, h)).length;
 }
 
 export function optDone(h, defs = DEFAULT_HABIT_DEFS) {
   if (!h || !Array.isArray(defs)) return 0;
-  return defs.filter((d) => d.group === "opt" && !d.archived && isHabitDone(d, h[d.id])).length;
+  return defs.filter((d) => d.group === "opt" && !d.archived && isHabitDoneOrMini(d, h)).length;
 }
 
 export const HABITS_REQ = DEFAULT_HABIT_DEFS.filter((d) => d.group === "req").map((d, i) => ({

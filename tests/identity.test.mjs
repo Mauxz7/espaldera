@@ -97,3 +97,22 @@ test("weekVotes: una sesión cubierta solo por Fitbit también vota por Atleta (
   assert.equal(atleta.votes, 2);
   assert.equal(atleta.days, 2);
 });
+
+test("weekVotes cuenta hábitos marcados en versión de 2 minutos (_mini)", () => {
+  const defs = [
+    { id: "r", kind: "check", identity: "lector", mini: "1 página" },
+    { id: "a", kind: "check", identity: "atleta", mini: "5 min" },
+  ];
+  const rows = weekVotes({
+    keys,
+    todayIdx: 2,
+    habitDefs: defs,
+    identities: ids,
+    habits: {
+      "2026-11-09": { _mini: { r: true } },
+      "2026-11-10": { r: true, _mini: { a: true } },
+    },
+  });
+  assert.equal(rows.find((x) => x.id === "lector").votes, 2);
+  assert.equal(rows.find((x) => x.id === "atleta").votes, 1);
+});

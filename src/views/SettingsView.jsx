@@ -53,6 +53,8 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
     unit: "",
     remindAt: "",
     identity: "",
+    after: "",
+    mini: "",
   });
 
   const connect = async () => { if (!token.trim() || !repo.trim()) return; await Sync.connect(token.trim(), repo.trim()); setToken(""); };
@@ -75,6 +77,8 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
       unit: "",
       remindAt: "",
       identity: "",
+      after: "",
+      mini: "",
     });
     setEditingId("new");
   };
@@ -88,6 +92,8 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
       unit: hb.unit || "",
       remindAt: hb.remindAt || "",
       identity: (identityOf(hb) || {}).id || "",
+      after: hb.after || "",
+      mini: hb.mini || "",
     });
     setEditingId(hb.id);
   };
@@ -98,6 +104,8 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
     const unit = form.kind === "count" ? (form.unit || "").trim() : "";
     const remindAt = form.remindAt ? form.remindAt.trim() : null;
     const identity = form.identity || null;
+    const after = form.after ? form.after.trim() : null;
+    const mini = form.mini ? form.mini.trim() : null;
 
     if (editingId === "new") {
       const prefix = form.group === "req" ? "o_" : "f_";
@@ -110,6 +118,8 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
         unit,
         remindAt,
         identity,
+        after,
+        mini,
         archived: false,
       };
       setHabitDefs([...defs, newHabit]);
@@ -125,6 +135,8 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
           unit,
           remindAt,
           identity,
+          after,
+          mini,
         };
       }));
     }
@@ -180,11 +192,17 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
             <span className="font-mono text-[10px] font-semibold text-accent">{prefix}{idx + 1}</span>
             <span className="truncate text-sm font-medium text-fg">{hb.label}</span>
           </div>
+          {hb.after && hb.after.trim() && (
+            <div className="truncate text-xs text-muted">{hb.after.trim()}</div>
+          )}
           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted">
             {hb.kind === "count" ? (
               <span className="font-mono text-accent">Meta: {hb.target}{hb.unit ? ` ${hb.unit}` : ""}</span>
             ) : (
               <span>Casilla</span>
+            )}
+            {hb.mini && hb.mini.trim() && (
+              <span>2 min: {hb.mini.trim()}</span>
             )}
             {hb.remindAt && (
               <span className="inline-flex items-center gap-0.5 font-mono text-muted">
@@ -362,6 +380,26 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
                 </label>
               </div>
             )}
+
+            <label className="block text-xs text-muted">Apilar después de (opcional)
+              <input
+                type="text"
+                value={form.after}
+                onChange={(e) => setForm({ ...form, after: e.target.value })}
+                placeholder="ej. Después de lavarme los dientes"
+                className="mt-1 min-h-[44px] w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-muted/60 focus:border-accent focus:outline-none"
+              />
+            </label>
+
+            <label className="block text-xs text-muted">Versión de 2 minutos (opcional)
+              <input
+                type="text"
+                value={form.mini}
+                onChange={(e) => setForm({ ...form, mini: e.target.value })}
+                placeholder="ej. Leer 1 página"
+                className="mt-1 min-h-[44px] w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-muted/60 focus:border-accent focus:outline-none"
+              />
+            </label>
 
             <label className="block text-xs text-muted">Identidad (cada vez que lo cumples es un voto)
               <select

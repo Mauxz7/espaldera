@@ -14,6 +14,8 @@ import {
   parseCliArgs,
   main,
   isHabitDone,
+  isHabitDoneOrMini,
+  getMissedYesterdayIds,
 } from "../scripts/recordatorios.mjs";
 import { isHabitDone as appIsHabitDone, DEFAULT_HABIT_DEFS } from "../src/data/habits.js";
 import { urlBase64ToUint8Array, subscriptionRecord, VAPID_PUBLIC_KEY } from "../src/lib/push.js";
@@ -263,4 +265,31 @@ test("main con --resumen envía el resumen semanal y con --test imprime sin envi
   assert.equal(bodies[0].title, "Resumen semanal");
   assert.match(bodies[0].body, /43% \(3\/7 días\)/);
   assert.match(bodies[0].body, /Racha actual: 3 días/);
+});
+
+test("recordatorios del servidor: after, _mini y «No falles dos veces seguidas»", async () => {
+  const defs = [
+    { id: "o_pills", label: "Tomar pastillas.", group: "req", kind: "check", target: 1, remindAt: "08:00", after: "Después de desayunar", mini: "Solo magnesio" },
+  ];
+  const parts = localParts(at("2026-11-12T18:07:00Z")); // 12:07 p.m. CR
+
+  // Si está en _mini no está pendiente y sí cuenta en el resumen semanal
+  assert.equal(isHabitDoneOrMini(defs[0], { _mini: { o_pills: true } }), true);
+  assert.equal(dueHabits(defs, { _mini: { o_pills: true } }, parts).length, 0);
+
+  const stats = computeRequiredHabitStats(defs, {
+    "2026-11-11": { _mini: { o_pills: true } },
+    "2026-11-12": { _mini: { o_pills: true } },
+  }, "2026-11-12", 7);
+  assert.equal(stats.daysDone, 2);
+  assert.equal(stats.streak, 2);
+
+  // Si ayer falló y hoy sigue pendiente: incluye after y «No falles dos veces seguidas»
+  const allHabits = { "2026-11-10": { o_pills: true } };
+  const missed = getMissedYesterdayIds(defs, allHabits, "2026-11-12");
+  assert.deepEqual(missed, ["o_pills"]);
+
+  const payload = buildPayload(defs, parts, missed);
+  assert.match(payload.body, /^Después de desayunar: /);
+  assert.match(payload.body, /No falles dos veces seguidas/);
 });

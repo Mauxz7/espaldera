@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { computeHabitStats, computeAllHabitStats } from "../src/lib/habitStats.js";
+import { computeHabitStats, computeAllHabitStats, isMissedYesterday } from "../src/lib/habitStats.js";
 import { addDays, dkey, fromKey } from "../src/lib/dates.js";
 
 test("computeHabitStats devuelve ceros y 30 días en falso cuando no hay registros", () => {
@@ -135,4 +135,48 @@ test("computeAllHabitStats omite hábitos archivados y asigna códigos por grupo
   assert.equal(all[1].id, "f1");
   assert.equal(all[1].code, "F1");
   assert.equal(all[1].currentStreak, 0);
+});
+
+test("computeHabitStats incluye _mini y calcula noTwoMissesStreak sin dos fallos seguidos", () => {
+  const def = { id: "o_read", group: "req", kind: "check", target: 1, mini: "1 página" };
+  const today = "2026-11-12";
+  // 07: false, 08: false (dos fallos seguidos -> aquí corta), 09: true, 10: false (1 fallo), 11: _mini, 12 (hoy): pendiente
+  const habits = {
+    "2026-11-09": { o_read: true },
+    "2026-11-11": { _mini: { o_read: true } },
+  };
+  const stats = computeHabitStats(def, habits, today);
+  assert.equal(stats.currentStreak, 1);
+  assert.equal(stats.noTwoMissesStreak, 2);
+  assert.equal(stats.done30, 2);
+  assert.equal(stats.days30[28].done, true);
+  assert.equal(stats.days30[28].mini, true);
+  assert.equal(stats.days30[29].done, false);
+
+  // Si ayer también falló (y el 10 tampoco), dos fallos seguidos -> noTwoMissesStreak = 0
+  const twoMisses = {
+    "2026-11-09": { o_read: true },
+  };
+  assert.equal(computeHabitStats(def, twoMisses, today).noTwoMissesStreak, 0);
+});
+
+test("isMissedYesterday detecta obligatorios fallados ayer y pendientes hoy", () => {
+  const req = { id: "o_creatine", group: "req", kind: "check", target: 1 };
+  const opt = { id: "f_read", group: "opt", kind: "check", target: 1 };
+  const today = "2026-11-12";
+
+  // Sin historial previo no avisa
+  assert.equal(isMissedYesterday(req, {}, today), false);
+
+  // Con historial previo pero ayer falló y hoy pendiente -> true solo para req
+  const habits = { "2026-11-10": { o_creatine: true } };
+  assert.equal(isMissedYesterday(req, habits, today), true);
+  assert.equal(isMissedYesterday(opt, habits, today), false);
+
+  // Si hoy ya se cumplió (normal o mini) -> false
+  assert.equal(isMissedYesterday(req, { ...habits, [today]: { o_creatine: true } }, today), false);
+  assert.equal(isMissedYesterday(req, { ...habits, [today]: { _mini: { o_creatine: true } } }, today), false);
+
+  // Si ayer se cumplió en 2 min -> false
+  assert.equal(isMissedYesterday(req, { "2026-11-11": { _mini: { o_creatine: true } } }, today), false);
 });

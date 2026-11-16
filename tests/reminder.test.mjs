@@ -226,3 +226,34 @@ test("ReminderBanner muestra un solo aviso con la lista de pendientes y un botó
   assert.match(html, /aria-label="Marcar Tomar creatina todos los días\."/);
   assert.match(html, /aria-label="Marcar Tomar 2 botellas de agua\."/);
 });
+
+test("recordatorios de app incluyen el ancla after y respetan la versión de 2 minutos", () => {
+  const hb = {
+    id: "o_read",
+    label: "Leer 15 min.",
+    group: "req",
+    kind: "check",
+    target: 1,
+    remindAt: "20:00",
+    after: "Después de lavarme los dientes",
+    mini: "Leer 1 página",
+  };
+  const at2030 = new Date(2026, 10, 12, 20, 30, 0);
+
+  // Si está marcado como 2 min ya no dispara aviso
+  assert.equal(isHabitDue(hb, { _mini: { o_read: true } }, at2030), false);
+  assert.equal(isHabitDue(hb, {}, at2030), true);
+
+  // Cuerpo del aviso incluye «Después de …: …»
+  const payload = buildNotificationPayload([hb], at2030);
+  assert.match(payload.body, /^Después de lavarme los dientes: /);
+
+  // Banner también muestra el ancla
+  const html = renderToStaticMarkup(
+    React.createElement(ReminderBanner, {
+      rem: { due: true, hidden: false, ringing: false, dueHabits: [hb], dayHabits: {}, setHidden: () => {} },
+      onTake: () => {},
+    })
+  );
+  assert.match(html, /Después de lavarme los dientes/);
+});
