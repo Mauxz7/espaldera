@@ -1,7 +1,7 @@
 // Votos por identidad (sin interfaz, con pruebas en tests/identity.test.mjs).
 // Cada hábito cumplido es un voto para la identidad del hábito; cada sesión
 // registrada en `log` (o cubierta por un entreno de Fitbit) es un voto para «Atleta».
-import { DEFAULT_HABIT_DEFS, isHabitDone } from "../data/habits.js";
+import { DEFAULT_HABIT_DEFS, isHabitDoneOrMini } from "../data/habits.js";
 import { DEFAULT_IDENTITIES, IDENTITY_COLORS, ATHLETE_ID, habitIdentity } from "../data/identities.js";
 
 // Lista de identidades válida: descarta entradas sin id y completa campos faltantes.
@@ -39,7 +39,7 @@ export function weekVotes({ keys, todayIdx, habits, habitDefs, identities, log, 
     const dayVotes = new Map();
     const add = (id) => { if (byId.has(id)) dayVotes.set(id, (dayVotes.get(id) || 0) + 1); };
     const h = (habits || {})[k] || {};
-    defs.forEach((d) => { if (isHabitDone(d, h[d.id])) add(habitIdentity(d)); });
+    defs.forEach((d) => { if (isHabitDoneOrMini(d, h)) add(habitIdentity(d)); });
     if ((log && log[k]) || (fromFitbit && fromFitbit[i])) add(ATHLETE_ID); // sesión hecha en Shift o registrada solo con Fitbit
     dayVotes.forEach((n, id) => { const r = byId.get(id); r.votes += n; r.days += 1; });
   }

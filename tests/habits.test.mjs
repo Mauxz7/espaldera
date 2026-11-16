@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_HABIT_DEFS,
   isHabitDone,
+  isHabitDoneOrMini,
   reqDone,
   optDone,
   CREATINE_ID,
@@ -122,4 +123,25 @@ test("reqDone y optDone funcionan con DEFAULT_HABIT_DEFS por defecto", () => {
   assert.equal(optDone(h), 1);
   assert.equal(reqDone(null), 0);
   assert.equal(optDone(null), 0);
+});
+
+test("isHabitDoneOrMini cuenta la versión de 2 minutos y reqDone/optDone la incluyen", () => {
+  const reqDef = { id: "o_read", group: "req", kind: "check", target: 1, mini: "Leer 1 página" };
+  const countDef = { id: "o_water", group: "req", kind: "count", target: 2, mini: "1 vaso" };
+  const optDef = { id: "f_read", group: "opt", kind: "check", target: 1, mini: "1 página" };
+
+  assert.equal(isHabitDoneOrMini(reqDef, {}), false);
+  assert.equal(isHabitDoneOrMini(reqDef, null), false);
+  assert.equal(isHabitDoneOrMini(reqDef, { _mini: { o_read: true } }), true);
+  assert.equal(isHabitDone(reqDef, undefined), false);
+
+  assert.equal(isHabitDoneOrMini(countDef, { o_water: 1 }), false);
+  assert.equal(isHabitDoneOrMini(countDef, { o_water: 1, _mini: { o_water: true } }), true);
+
+  const day = {
+    _mini: { o_read: true, f_read: true },
+    o_water: 2,
+  };
+  assert.equal(reqDone(day, [reqDef, countDef]), 2);
+  assert.equal(optDone(day, [optDef]), 1);
 });

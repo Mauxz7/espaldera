@@ -1,5 +1,5 @@
 import { dkey, fromKey, addDays } from "./dates.js";
-import { DEFAULT_HABIT_DEFS, isHabitDone } from "../data/habits.js";
+import { DEFAULT_HABIT_DEFS, isHabitDone, isHabitDoneOrMini } from "../data/habits.js";
 
 export const DEFAULT_WINDOW_DAYS = 30;
 
@@ -35,8 +35,9 @@ export function computeHabitStats(def, habits = {}, today = new Date(), windowDa
     const date = dkey(addDays(todayDate, i - (totalWindow - 1)));
     const dayData = safeHabits[date];
     const val = dayData && typeof dayData === "object" ? dayData[habitDef.id] : undefined;
-    const done = isHabitDone(habitDef, val);
-    return { date, done };
+    const full = isHabitDone(habitDef, val);
+    const done = isHabitDoneOrMini(habitDef, dayData);
+    return { date, done, mini: !full && done };
   });
 
   const done30 = days30.filter((d) => d.done).length;
@@ -58,7 +59,9 @@ export function computeHabitStats(def, habits = {}, today = new Date(), windowDa
         const date = dkey(addDays(earliestDate, i));
         const dayData = safeHabits[date];
         const val = dayData && typeof dayData === "object" ? dayData[habitDef.id] : undefined;
-        return { date, done: isHabitDone(habitDef, val) };
+        const full = isHabitDone(habitDef, val);
+        const done = isHabitDoneOrMini(habitDef, dayData);
+        return { date, done, mini: !full && done };
       });
       allDays = [...prefix, ...days30];
     }
@@ -84,15 +87,43 @@ export function computeHabitStats(def, habits = {}, today = new Date(), windowDa
     }
   }
 
+  let noTwoMissesStreak = 0;
+  let consecutiveMisses = 0;
+  for (let i = allDays.length - 1; i >= 0; i--) {
+    if (allDays[i].done) {
+      consecutiveMisses = 0;
+      noTwoMissesStreak++;
+    } else if (i !== allDays.length - 1) {
+      consecutiveMisses++;
+      if (consecutiveMisses >= 2) break;
+    }
+  }
+
   return {
     id: habitDef.id,
     currentStreak,
+    noTwoMissesStreak,
     bestStreak,
+    missedYesterday: isMissedYesterday(habitDef, safeHabits, todayKey),
     done30,
     rate30,
     pct30: rate30,
     days30,
   };
+}
+
+/**
+ * Indica si un hábito obligatorio falló ayer y hoy sigue pendiente (requiere historial previo).
+ */
+export function isMissedYesterday(def, habits = {}, today = new Date()) {
+  if (!def || def.archived || (def.group && def.group !== "req")) return false;
+  const safeHabits = habits && typeof habits === "object" ? habits : {};
+  const todayKey = normalizeDateKey(today);
+  const hasPriorHistory = Object.keys(safeHabits).some((k) => /^\d{4}-\d{2}-\d{2}$/.test(k) && k < todayKey);
+  if (!hasPriorHistory) return false;
+  const yesterdayKey = dkey(addDays(fromKey(todayKey), -1));
+  if (isHabitDoneOrMini(def, safeHabits[todayKey])) return false;
+  return !isHabitDoneOrMini(def, safeHabits[yesterdayKey]);
 }
 
 /**
