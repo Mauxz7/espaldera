@@ -167,9 +167,10 @@ El plan se calculaba por semana (lun–dom) y el lunes se planeaba «en blanco»
 - Lista de «dopamina barata» con límite diario (p. ej. redes, videos cortos) que se registra con un toque, y lista de «dopamina buena» (leer, entrenar, caminar, estudiar) que suma votos.
 - Contador del día y de la semana en Hábitos; nada de bloqueo, solo registro honesto.
 
-### D2 · Sueño desde Fitbit
-- Ampliar el flujo de Google Health para traer sueño (duración y hora de dormir) a la clave `sleep`. Requiere el permiso de sueño en el script de autorización.
-- Votos automáticos para «Persona descansada» (p. ej. ≥ 7 h o dormir antes de la hora meta). Si durmió poco, el plan sugiere sesión suave.
+### ✅ D2 · Sueño desde Fitbit
+- `scripts/google-health.mjs` pide también `dataTypes/sleep` (permiso `googlehealth.sleep.readonly`, mismo token de Fitbit) y guarda las últimas noches en la clave `sleep` (`{día en que despertaste: {min, bed, wake}}`, 60 días; copia maestra en `health/sleep.json`). Si el token no trae el permiso, los entrenos siguen llegando y el registro lo avisa.
+- Votos para «Persona descansada»: noche de 7 h o más, o dormirse antes de las 11 p.m.
+- En Inicio: «Dormiste 6 h 50 min» y, con menos de 6 h y una sesión planeada, la sugerencia de cambiar a la sesión suave.
 
 ### D3 · Revisión semanal y frasco de logros
 - El domingo, una pantalla corta: votos por identidad, entrenos, lo que salió bien, qué ajustar (texto libre guardado en la clave `reviews`). El aviso «Resumen semanal» abre esta pantalla.

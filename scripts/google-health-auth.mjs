@@ -7,7 +7,7 @@ import http from "node:http";
 import crypto from "node:crypto";
 import readline from "node:readline";
 import { spawnSync } from "node:child_process";
-import { SCOPE, fetchExercises } from "./google-health.mjs";
+import { SCOPES, fetchExercises, fetchSleep, toSleep } from "./google-health.mjs";
 
 // Calendario (Fase 7): crear y editar solo el calendario «Shift» que hace la app + leer eventos para sugerir noches ocupadas y exámenes.
 // Va en un token APARTE: la Google Health API rechaza tokens que traen otros permisos (DISALLOWED_OAUTH_SCOPES).
@@ -99,11 +99,17 @@ async function authorize(clientId, clientSecret, scope, mustInclude, what) {
 }
 
 async function healthStep(clientId, clientSecret) {
-  const tok = await authorize(clientId, clientSecret, SCOPE, "googlehealth.activity_and_fitness", "actividad y ejercicio (Fitbit)");
+  const tok = await authorize(clientId, clientSecret, SCOPES, "googlehealth.activity_and_fitness", "actividad, ejercicio y sueño (Fitbit)");
   // Prueba real antes de guardar: ¿la API responde con tus entrenos?
   const since = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   const points = await fetchExercises(fetch, tok.access_token, since);
   console.log(`\nGoogle Health respondió: ${points.length} entrenos en los últimos 30 días.`);
+  try {
+    const nights = (await fetchSleep(fetch, tok.access_token, since)).map(toSleep).filter(Boolean);
+    console.log(`Sueño: ${nights.length} noches en los últimos 30 días.`);
+  } catch (e) {
+    console.log("Sueño: sin permiso (¿quedó sin marcar la casilla de sueño?). Los entrenos funcionan igual; puedes repetir con --solo-fitbit.");
+  }
   setSecret("GOOGLE_HEALTH_CLIENT_ID", clientId);
   setSecret("GOOGLE_HEALTH_CLIENT_SECRET", clientSecret);
   setSecret("GOOGLE_HEALTH_REFRESH_TOKEN", tok.refresh_token);
