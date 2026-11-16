@@ -156,7 +156,7 @@ El plan se calculaba por semana (lun–dom) y el lunes se planeaba «en blanco»
 - Cada hábito cumplido = un «voto» para esa identidad. Tarjeta en Inicio con los votos de la semana por identidad (barras o anillos), frase tipo «Esta semana votaste 9 veces por ser Atleta».
 - Puente opcional con Mana Core: minutos de focus del día como votos de Estudiante (ver M1).
 
-### I2 · Mejores hábitos
+### ✅ I2 · Mejores hábitos
 - **Apilar:** cada hábito puede tener un «después de…» (ancla) que se muestra en el recordatorio y en la lista.
 - **Versión de 2 minutos:** cada hábito tiene una versión mínima; marcarla cuenta como hecho (con otra marca visual) para no romper la racha.
 - **Nunca fallar dos veces:** si ayer falló un hábito obligatorio, hoy aparece destacado y el aviso del servidor lo menciona. Las rachas pasan a medir «sin dos fallos seguidos».
