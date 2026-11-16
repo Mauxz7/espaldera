@@ -140,11 +140,14 @@ test("main sigue con los entrenos si Google niega el permiso de sueño", async (
 test("main guarda el sueño en data.json", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "espaldera-gh-"));
   const base = fakeFetch({ pages: [[walk]] });
-  const f = async (url, opts) => (url.includes("/dataTypes/sleep/")
+  const calls = [];
+  const f = async (url, opts) => (calls.push(url), url.includes("/dataTypes/sleep/")
     ? { ok: true, json: async () => ({ dataPoints: [night()] }) }
     : base(url, opts));
   const res = await main({ root, now: new Date("2026-11-16T12:00:00Z"), env, fetchImpl: f });
   assert.deepEqual(res.sleep, { nights: 1, changed: true });
+  const sleepCall = calls.find((u) => u.includes("/dataTypes/sleep/"));
+  assert.equal(new URL(sleepCall).searchParams.get("filter"), 'sleep.interval.civil_end_time >= "2026-11-02"'); // civil_start_time da 400 en sueño
   const data = JSON.parse(fs.readFileSync(path.join(root, "data.json"), "utf8"));
   assert.equal(data.sleep.v["2026-11-15"].min, 418);
 });

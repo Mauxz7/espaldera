@@ -108,7 +108,10 @@ async function healthStep(clientId, clientSecret) {
     const nights = (await fetchSleep(fetch, tok.access_token, since)).map(toSleep).filter(Boolean);
     console.log(`Sueño: ${nights.length} noches en los últimos 30 días.`);
   } catch (e) {
-    console.log("Sueño: sin permiso (¿quedó sin marcar la casilla de sueño?). Los entrenos funcionan igual; puedes repetir con --solo-fitbit.");
+    const why = e.status === 403
+      ? "sin permiso (¿quedó sin marcar la casilla de sueño?). Puedes repetir con --solo-fitbit."
+      : e.message;
+    console.log(`Sueño: ${why} Los entrenos funcionan igual.`);
   }
   setSecret("GOOGLE_HEALTH_CLIENT_ID", clientId);
   setSecret("GOOGLE_HEALTH_CLIENT_SECRET", clientSecret);
