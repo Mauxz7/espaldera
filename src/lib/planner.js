@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { usePersisted } from "./storage.js";
 import { dkey, fromKey, addDays, mondayOf, dayDiff, pruneDays } from "./dates.js";
 import { routineById } from "../data/program.js";
+import { calNight, calExamSoon } from "./calendar.js";
 
 export const MAIN = ["d1", "d2", "d3", "d4"];
 
@@ -13,7 +14,7 @@ export const DEFAULT_OFFICE = [true, false, true, true, true, false, false]; // 
 // Un día de oficina con la noche libre (sin clase) se entrena de noche: no compite con la mañana corta.
 export const isEvening = (office, night, i) => !!(night && night[i] && office[i]);
 
-export function scorePlan(arr, office, night, effort) {
+export function scorePlan(arr, office, night, effort, exam) {
   let s = 0;
   for (let i = 0; i < 7; i++) {
     const r = arr[i];
@@ -24,6 +25,7 @@ export function scorePlan(arr, office, night, effort) {
     if (prev && isEvening(office, night, i - 1) && !eve) s += office[i] ? 6 : 3; // de noche y otra vez al amanecer: poca recuperación (en casa puedes empezar más tarde)
     if (office[i] && !eve) s += 6 + Math.max(0, routineById(r).minutes - 35) * 0.4; // mañana corta: mejor descansar o sesión breve
     if (i === 6) s += 3; // el domingo se prefiere libre
+    if (exam && exam[i]) s += r === "d2" || r === "d4" ? 8 : 4; // examen o entrega hoy o mañana (Google Calendar): mejor descanso o algo liviano
     if (effort && i > 0 && effort[i - 1] && !prev) {
       s += 2; // el día anterior hubo deporte fuerte en Fitbit: cuenta como días seguidos
       if (r === "d2") s += 8; // pierna después de raqueta, fútbol o similar
@@ -43,7 +45,7 @@ export function scorePlan(arr, office, night, effort) {
 }
 
 // Todas las formas de colocar las sesiones pendientes en los días libres desde fromIdx, de mejor a peor.
-export function rankPlans(office, fixed, fromIdx, night, effort) {
+export function rankPlans(office, fixed, fromIdx, night, effort, exam) {
   const done = Object.values(fixed);
   const left = MAIN.filter((m) => !done.includes(m));
   const free = [];
@@ -52,7 +54,7 @@ export function rankPlans(office, fixed, fromIdx, night, effort) {
   Object.keys(fixed).forEach((i) => { base[i] = fixed[i]; });
   const out = [];
   const rec = (si, arr) => {
-    if (si === left.length) { out.push({ arr: arr.slice(), score: scorePlan(arr, office, night, effort) }); return; }
+    if (si === left.length) { out.push({ arr: arr.slice(), score: scorePlan(arr, office, night, effort, exam) }); return; }
     for (const d of free) if (!arr[d]) { arr[d] = left[si]; rec(si + 1, arr); arr[d] = null; }
     rec(si + 1, arr);
   };
@@ -94,12 +96,15 @@ export function fitbitSession(kind, planned, done) {
   return STRENGTH_ORDER.find((r) => !done.includes(r)) || null;
 }
 
-export function weekState(weekPlan, log, mk, workouts) {
+export function weekState(weekPlan, log, mk, workouts, calBusy) {
   const keys = Array.from({ length: 7 }, (_, i) => dkey(addDays(fromKey(mk), i)));
   const stored = (weekPlan || {})[mk];
   const lastKey = Object.keys(weekPlan || {}).filter((k) => k <= mk && weekPlan[k] && weekPlan[k].office).sort().pop();
   const office = (stored && stored.office) || (lastKey && weekPlan[lastKey].office) || DEFAULT_OFFICE;
-  const night = (stored && Array.isArray(stored.night) && stored.night) || Array(7).fill(false); // las cancelaciones no se heredan de otra semana
+  // Noches: lo que marcaste esta semana manda; si no tocaste nada, se sugiere desde Google Calendar (sin datos = ocupada).
+  // Las marcas no se heredan de otra semana.
+  const night = (stored && Array.isArray(stored.night) && stored.night) || calNight(calBusy, keys);
+  const exam = calExamSoon(calBusy, keys);
   const fixed = {};
   keys.forEach((k, i) => { if (log[k]) fixed[i] = log[k].r; });
   const fit = fitbitWeek(workouts, keys);
@@ -116,49 +121,63 @@ export function weekState(weekPlan, log, mk, workouts) {
     const done = Object.values(fixed);
     arr = stored.plan.map((r, i) => (r && !fixed[i] && !done.includes(r) ? r : null));
     Object.keys(fixed).forEach((i) => { arr[i] = fixed[i]; });
-  } else arr = rankPlans(office, fixed, 0, night, effort)[0].arr;
-  return { keys, office, night, fixed, arr, fit, effort, fromFitbit };
+  } else arr = rankPlans(office, fixed, 0, night, effort, exam)[0].arr;
+  return { keys, office, night, fixed, arr, fit, effort, fromFitbit, exam };
 }
 
 export function useWeekPlan(log) {
   const [weekPlan, setWeekPlan] = usePersisted("weekPlan", {});
   const [workouts] = usePersisted("workouts", []); // de Fitbit; solo lectura
+  const [calBusy] = usePersisted("calBusy", null); // de Google Calendar; solo lectura
   const today = dkey();
   const mk = dkey(mondayOf(new Date()));
   const todayIdx = dayDiff(today, mk);
-  const ws = useMemo(() => weekState(weekPlan, log, mk, workouts), [weekPlan, log, mk, workouts]);
+  const ws = useMemo(() => weekState(weekPlan, log, mk, workouts, calBusy), [weekPlan, log, mk, workouts, calBusy]);
 
   const save = (all, office, plan, night) => pruneDays({ ...(all || {}), [mk]: { office, plan, night } }, 8);
   // Reacomodar: recoloca lo pendiente de hoy en adelante y, en cada toque, pasa a la siguiente mejor opción.
   const shuffle = () => setWeekPlan((all) => {
-    const cur = weekState(all, log, mk, workouts);
-    const ranked = rankPlans(cur.office, cur.fixed, todayIdx, cur.night, cur.effort);
+    const cur = weekState(all, log, mk, workouts, calBusy);
+    const ranked = rankPlans(cur.office, cur.fixed, todayIdx, cur.night, cur.effort, cur.exam);
     const ok = ranked.filter((p) => p.score < 1000);
     const pool = (ok.length ? ok : ranked).slice(0, 6);
     const idx = pool.findIndex((p) => p.arr.join() === cur.arr.join());
     return save(all, cur.office, pool[(idx + 1) % pool.length].arr, cur.night);
   });
   const toggleOffice = (i) => setWeekPlan((all) => {
-    const cur = weekState(all, log, mk, workouts);
+    const cur = weekState(all, log, mk, workouts, calBusy);
     const office = cur.office.map((v, k) => (k === i ? !v : v));
-    return save(all, office, rankPlans(office, cur.fixed, todayIdx, cur.night, cur.effort)[0].arr, cur.night);
+    return save(all, office, rankPlans(office, cur.fixed, todayIdx, cur.night, cur.effort, cur.exam)[0].arr, cur.night);
   });
   const toggleNight = (i) => setWeekPlan((all) => {
-    const cur = weekState(all, log, mk, workouts);
+    const cur = weekState(all, log, mk, workouts, calBusy);
     const night = cur.night.map((v, k) => (k === i ? !v : v));
-    return save(all, cur.office, rankPlans(cur.office, cur.fixed, todayIdx, night, cur.effort)[0].arr, night);
+    return save(all, cur.office, rankPlans(cur.office, cur.fixed, todayIdx, night, cur.effort, cur.exam)[0].arr, night);
   });
-  const info = (dateKey) => {
-    const m = dkey(mondayOf(fromKey(dateKey)));
-    const w = m === mk ? ws : weekState(weekPlan, log, m, workouts);
+  const dayInfo = (w, m, dateKey) => {
     const i = dayDiff(dateKey, m);
     const rid = w.arr[i] || null;
     const evening = !!rid && isEvening(w.office, w.night, i);
-    return { date: dateKey, office: !!w.office[i], night: !!w.night[i], rid, evening, wake: rid && !evening ? "6:30" : "7:00" };
+    return { date: dateKey, office: !!w.office[i], night: !!w.night[i], rid, evening, wake: rid && !evening ? "6:30" : "7:00", exam: !!(w.exam && w.exam[i]) };
   };
+  const info = (dateKey) => {
+    const m = dkey(mondayOf(fromKey(dateKey)));
+    return dayInfo(m === mk ? ws : weekState(weekPlan, log, m, workouts, calBusy), m, dateKey);
+  };
+  // Próximos 14 días (para Google Calendar), calculando cada semana una sola vez.
+  const upcoming = useMemo(() => {
+    const cache = { [mk]: ws };
+    return Array.from({ length: 14 }, (_, n) => {
+      const k = dkey(addDays(fromKey(today), n));
+      const m = dkey(mondayOf(fromKey(k)));
+      if (!cache[m]) cache[m] = weekState(weekPlan, log, m, workouts, calBusy);
+      return dayInfo(cache[m], m, k);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ws, today, weekPlan, log, workouts, calBusy]);
   const nextRid = ws.arr.slice(todayIdx).find((r, k) => r && !ws.fixed[todayIdx + k]) || null;
   const late = ws.arr.some((r, i) => r && i < todayIdx && !ws.fixed[i]);
-  return { ...ws, todayIdx, shuffle, toggleOffice, toggleNight, info, nextRid, late };
+  return { ...ws, todayIdx, shuffle, toggleOffice, toggleNight, info, nextRid, late, upcoming };
 }
 
 export function computeStreak(log) {

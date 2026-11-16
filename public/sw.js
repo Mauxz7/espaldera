@@ -20,7 +20,7 @@ self.addEventListener("fetch", (e) => {
 self.addEventListener("push", (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (err) { d = { body: e.data ? e.data.text() : "" }; }
-  e.waitUntil(self.registration.showNotification(d.title || "Espaldera", {
+  e.waitUntil(self.registration.showNotification(d.title || "Shift", {
     body: d.body || "Tienes hábitos pendientes.",
     tag: d.tag || "espaldera-recordatorio",
     renotify: true,

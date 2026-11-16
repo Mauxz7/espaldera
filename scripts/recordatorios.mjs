@@ -95,7 +95,7 @@ export function buildPayload(due, parts) {
 }
 
 export function buildNoticePayload(title, body = "") {
-  const t = String(title || "").trim() || "Aviso de Espaldera";
+  const t = String(title || "").trim() || "Aviso de Shift";
   const b = String(body || "").trim();
   return { tag: "espaldera-aviso", url: APP_URL, title: t, body: b };
 }
@@ -313,7 +313,7 @@ export async function main(opts = {}) {
   let payload;
   let nextSent = state.sent || {};
   if (test) {
-    payload = { tag: "espaldera-prueba", url: APP_URL, title: "Prueba de Espaldera", body: "Si ves esto, los avisos con la app cerrada funcionan en este dispositivo." };
+    payload = { tag: "espaldera-prueba", url: APP_URL, title: "Prueba de Shift", body: "Si ves esto, los avisos con la app cerrada funcionan en este dispositivo." };
   } else {
     const defs = data.habitDefs && Array.isArray(data.habitDefs.v) ? data.habitDefs.v : FALLBACK_DEFS;
     const day = (data.habits && data.habits.v && data.habits.v[parts.date]) || {};
