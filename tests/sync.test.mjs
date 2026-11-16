@@ -64,3 +64,14 @@ test("una clave inválida se reporta como error 401", async () => {
   assert.equal(st.state, "error");
   assert.equal(st.code, 401);
 });
+
+test("dopamineDefs y dopamine se sincronizan entre dispositivos", async () => {
+  const a = await device("f");
+  const b = await device("g");
+  await a.write("dopamineDefs", [{ id: "d_read", label: "Leer", kind: "good", identity: "lector" }], 3000);
+  await a.write("dopamine", { "2026-11-15": { d_read: 2 } }, 3000);
+  await a.sync();
+  await b.sync();
+  assert.deepEqual(await b.read("dopamineDefs"), [{ id: "d_read", label: "Leer", kind: "good", identity: "lector" }]);
+  assert.deepEqual(await b.read("dopamine"), { "2026-11-15": { d_read: 2 } });
+});
