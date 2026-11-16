@@ -14,19 +14,25 @@ export const DEFAULT_OFFICE = [true, false, true, true, true, false, false]; // 
 // Un día de oficina con la noche libre (sin clase) se entrena de noche: no compite con la mañana corta.
 export const isEvening = (office, night, i) => !!(night && night[i] && office[i]);
 
-export function scorePlan(arr, office, night, effort, exam) {
+// tail: los dos últimos días de la semana anterior ({ r1: domingo, r2: sábado, effort1, eve1 }).
+// Así el lunes no se planea «en blanco»: si el domingo hubo pierna o deporte fuerte, cuenta como el día anterior.
+export function scorePlan(arr, office, night, effort, exam, tail) {
+  const t = tail || {};
+  const P = (j) => (j >= 0 ? arr[j] : j === -1 ? t.r1 || null : j === -2 ? t.r2 || null : null);
+  const E = (j) => (j >= 0 ? !!(effort && effort[j]) : j === -1 ? !!t.effort1 : false);
+  const V = (j) => (j >= 0 ? isEvening(office, night, j) : j === -1 ? !!t.eve1 : false);
   let s = 0;
   for (let i = 0; i < 7; i++) {
     const r = arr[i];
     if (!r) continue;
-    const prev = i > 0 ? arr[i - 1] : null;
+    const prev = P(i - 1);
     const eve = isEvening(office, night, i);
     if (eve) s -= 8; // marcaste esa noche libre para entrenar: se aprovecha
-    if (prev && isEvening(office, night, i - 1) && !eve) s += office[i] ? 6 : 3; // de noche y otra vez al amanecer: poca recuperación (en casa puedes empezar más tarde)
+    if (prev && V(i - 1) && !eve) s += office[i] ? 6 : 3; // de noche y otra vez al amanecer: poca recuperación (en casa puedes empezar más tarde)
     if (office[i] && !eve) s += 6 + Math.max(0, routineById(r).minutes - 35) * 0.4; // mañana corta: mejor descansar o sesión breve
     if (i === 6) s += 3; // el domingo se prefiere libre
     if (exam && exam[i]) s += r === "d2" || r === "d4" ? 8 : 4; // examen o entrega hoy o mañana (Google Calendar): mejor descanso o algo liviano
-    if (effort && i > 0 && effort[i - 1] && !prev) {
+    if (E(i - 1) && !prev) {
       s += 2; // el día anterior hubo deporte fuerte en Fitbit: cuenta como días seguidos
       if (r === "d2") s += 8; // pierna después de raqueta, fútbol o similar
       if (r === "d3") s += 4;
@@ -37,7 +43,7 @@ export function scorePlan(arr, office, night, effort, exam) {
       if (r === "d3" && prev === "d4") s += 12; // full body también carga piernas
       if (r === "d2" && prev === "d3") s += 8; // pierna con las piernas del trote
       if ((r === "d4" && prev === "d2") || (r === "d2" && prev === "d4")) s += 6;
-      if (i > 1 && arr[i - 2]) s += 8; // tres días seguidos
+      if (P(i - 2)) s += 8; // tres días seguidos
     }
   }
   s += MAIN.filter((m) => !arr.includes(m)).length * 100; // sesión que no cabe
@@ -45,7 +51,7 @@ export function scorePlan(arr, office, night, effort, exam) {
 }
 
 // Todas las formas de colocar las sesiones pendientes en los días libres desde fromIdx, de mejor a peor.
-export function rankPlans(office, fixed, fromIdx, night, effort, exam) {
+export function rankPlans(office, fixed, fromIdx, night, effort, exam, tail) {
   const done = Object.values(fixed);
   const left = MAIN.filter((m) => !done.includes(m));
   const free = [];
@@ -54,7 +60,7 @@ export function rankPlans(office, fixed, fromIdx, night, effort, exam) {
   Object.keys(fixed).forEach((i) => { base[i] = fixed[i]; });
   const out = [];
   const rec = (si, arr) => {
-    if (si === left.length) { out.push({ arr: arr.slice(), score: scorePlan(arr, office, night, effort, exam) }); return; }
+    if (si === left.length) { out.push({ arr: arr.slice(), score: scorePlan(arr, office, night, effort, exam, tail) }); return; }
     for (const d of free) if (!arr[d]) { arr[d] = left[si]; rec(si + 1, arr); arr[d] = null; }
     rec(si + 1, arr);
   };
@@ -96,7 +102,17 @@ export function fitbitSession(kind, planned, done) {
   return STRENGTH_ORDER.find((r) => !done.includes(r)) || null;
 }
 
-export function weekState(weekPlan, log, mk, workouts, calBusy) {
+// Cola de la semana anterior: lo hecho (registro o Fitbit) en sábado y domingo; si esos días todavía no
+// pasan (vista previa desde el fin de semana), lo planeado. Un día que ya pasó sin entreno cuenta como descanso.
+export function weekTail(weekPlan, log, mk, workouts, calBusy, today = dkey()) {
+  const prevMk = dkey(addDays(fromKey(mk), -7));
+  const pw = weekState(weekPlan, log, prevMk, workouts, calBusy, { noTail: true });
+  const pick = (i) => (pw.fixed[i] || (pw.keys[i] >= today ? pw.arr[i] : null)) || null;
+  const r1 = pick(6);
+  return { r1, r2: pick(5), effort1: !!pw.effort[6], eve1: !!r1 && isEvening(pw.office, pw.night, 6) };
+}
+
+export function weekState(weekPlan, log, mk, workouts, calBusy, opts = {}) {
   const keys = Array.from({ length: 7 }, (_, i) => dkey(addDays(fromKey(mk), i)));
   const stored = (weekPlan || {})[mk];
   const lastKey = Object.keys(weekPlan || {}).filter((k) => k <= mk && weekPlan[k] && weekPlan[k].office).sort().pop();
@@ -105,6 +121,7 @@ export function weekState(weekPlan, log, mk, workouts, calBusy) {
   // Las marcas no se heredan de otra semana.
   const night = (stored && Array.isArray(stored.night) && stored.night) || calNight(calBusy, keys);
   const exam = calExamSoon(calBusy, keys);
+  const tail = opts.noTail ? null : weekTail(weekPlan, log, mk, workouts, calBusy, opts.today);
   const fixed = {};
   keys.forEach((k, i) => { if (log[k]) fixed[i] = log[k].r; });
   const fit = fitbitWeek(workouts, keys);
@@ -121,8 +138,8 @@ export function weekState(weekPlan, log, mk, workouts, calBusy) {
     const done = Object.values(fixed);
     arr = stored.plan.map((r, i) => (r && !fixed[i] && !done.includes(r) ? r : null));
     Object.keys(fixed).forEach((i) => { arr[i] = fixed[i]; });
-  } else arr = rankPlans(office, fixed, 0, night, effort, exam)[0].arr;
-  return { keys, office, night, fixed, arr, fit, effort, fromFitbit, exam };
+  } else arr = rankPlans(office, fixed, 0, night, effort, exam, tail)[0].arr;
+  return { keys, office, night, fixed, arr, fit, effort, fromFitbit, exam, tail };
 }
 
 export function useWeekPlan(log) {
@@ -138,7 +155,7 @@ export function useWeekPlan(log) {
   // Reacomodar: recoloca lo pendiente de hoy en adelante y, en cada toque, pasa a la siguiente mejor opción.
   const shuffle = () => setWeekPlan((all) => {
     const cur = weekState(all, log, mk, workouts, calBusy);
-    const ranked = rankPlans(cur.office, cur.fixed, todayIdx, cur.night, cur.effort, cur.exam);
+    const ranked = rankPlans(cur.office, cur.fixed, todayIdx, cur.night, cur.effort, cur.exam, cur.tail);
     const ok = ranked.filter((p) => p.score < 1000);
     const pool = (ok.length ? ok : ranked).slice(0, 6);
     const idx = pool.findIndex((p) => p.arr.join() === cur.arr.join());
@@ -147,12 +164,12 @@ export function useWeekPlan(log) {
   const toggleOffice = (i) => setWeekPlan((all) => {
     const cur = weekState(all, log, mk, workouts, calBusy);
     const office = cur.office.map((v, k) => (k === i ? !v : v));
-    return save(all, office, rankPlans(office, cur.fixed, todayIdx, cur.night, cur.effort, cur.exam)[0].arr, cur.night);
+    return save(all, office, rankPlans(office, cur.fixed, todayIdx, cur.night, cur.effort, cur.exam, cur.tail)[0].arr, cur.night);
   });
   const toggleNight = (i) => setWeekPlan((all) => {
     const cur = weekState(all, log, mk, workouts, calBusy);
     const night = cur.night.map((v, k) => (k === i ? !v : v));
-    return save(all, cur.office, rankPlans(cur.office, cur.fixed, todayIdx, night, cur.effort, cur.exam)[0].arr, night);
+    return save(all, cur.office, rankPlans(cur.office, cur.fixed, todayIdx, night, cur.effort, cur.exam, cur.tail)[0].arr, night);
   });
   const dayInfo = (w, m, dateKey) => {
     const i = dayDiff(dateKey, m);

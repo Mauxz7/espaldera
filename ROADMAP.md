@@ -144,6 +144,11 @@ La app deja de ser solo de entreno: pasa a llamarse **Shift** (hábitos e identi
 - `planner.js` usa `calBusy` solo para días sin marca manual de noche; lo que el usuario marque a mano siempre gana. Si `calBusy` dice noche ocupada pero el usuario la marcó libre, no se avisa ni se corrige. Día de examen o el anterior: preferir sesión suave o descanso.
 - Las reglas de lectura van en funciones puras con pruebas (sin datos personales en las pruebas).
 
+### ✅ C4 · Continuidad entre semanas · **Hecha por Claude**
+El plan se calculaba por semana (lun–dom) y el lunes se planeaba «en blanco».
+- `weekTail` (`lib/planner.js`): sábado y domingo de la semana anterior (registro o Fitbit; si aún no pasan, lo planeado) + esfuerzo de Fitbit del domingo. `scorePlan`/`rankPlans` los usan como días -1 y -2: nunca running el lunes tras pierna el domingo, deporte fuerte el domingo pesa sobre pierna el lunes, sábado+domingo+lunes = tres días seguidos.
+- Así «Mañana» del domingo, el evento del lunes en Google Calendar y el plan real del lunes salen de la misma lógica.
+
 ## Fase 8 · Identidad
 
 ### I1 · Identidades y votos

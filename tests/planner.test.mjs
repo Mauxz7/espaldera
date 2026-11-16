@@ -88,3 +88,35 @@ test("después de raqueta o fútbol no se pone pierna al día siguiente", () => 
   assert.notEqual(best[5], "d2", best.join());
   assert.equal(best[6], "d2", "la pierna se mueve al domingo");
 });
+
+// Continuidad entre semanas: el lunes se planea sabiendo lo del sábado y el domingo.
+import { weekTail } from "../src/lib/planner.js";
+
+const HOME = Array(7).fill(false);
+const mon = (r) => [r, null, null, null, null, null, null];
+
+test("scorePlan con la cola: nunca correr el lunes después de pierna el domingo", () => {
+  assert.ok(scorePlan(mon("d3"), HOME, HOME, null, null, { r1: "d2" }) >= 1000);
+  assert.ok(scorePlan(mon("d3"), HOME, HOME, null, null, null) < 1000);
+});
+
+test("scorePlan con la cola: deporte fuerte el domingo pesa sobre pierna el lunes; sábado+domingo+lunes = tres seguidos", () => {
+  const base = scorePlan(mon("d2"), HOME, HOME, null, null, null);
+  assert.equal(scorePlan(mon("d2"), HOME, HOME, null, null, { effort1: true }) - base, 10);
+  const two = scorePlan(mon("d1"), HOME, HOME, null, null, { r1: "d4" });
+  const three = scorePlan(mon("d1"), HOME, HOME, null, null, { r1: "d4", r2: "d2" });
+  assert.equal(three - two, 8);
+});
+
+test("weekTail: lo registrado manda; lo planeado solo cuenta si ese día aún no pasa", () => {
+  const plan = { "2026-11-09": { office: HOME, night: HOME, plan: [null, null, null, null, null, "d1", "d2"] } };
+  assert.equal(weekTail(plan, {}, "2026-11-16", [], null, "2026-11-15").r1, "d2"); // domingo: vista previa con lo planeado
+  assert.equal(weekTail(plan, {}, "2026-11-16", [], null, "2026-11-16").r1, null); // lunes: el domingo pasó sin entreno
+  assert.equal(weekTail(plan, { "2026-11-15": { r: "d4" } }, "2026-11-16", [], null, "2026-11-16").r1, "d4");
+});
+
+test("weekState: el lunes que sigue a pierna del domingo no es running", () => {
+  const ws = weekState({}, { "2026-11-15": { r: "d2" } }, "2026-11-16", [], null, { today: "2026-11-15" });
+  assert.equal(ws.tail.r1, "d2");
+  assert.notEqual(ws.arr[0], "d3");
+});
