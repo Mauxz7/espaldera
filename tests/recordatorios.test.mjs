@@ -12,6 +12,7 @@ import {
   computeRequiredHabitStats,
   buildWeeklySummary,
   parseCliArgs,
+  shiftDateKey,
   main,
   isHabitDone,
   isHabitDoneOrMini,
@@ -244,16 +245,30 @@ test("main con --resumen envía el resumen semanal y con --test imprime sin envi
       at: 1,
     },
   };
-  fs.writeFileSync(path.join(root, "data.json"), JSON.stringify(sampleData));
-
-  // Modo --resumen --test por línea de comandos real (sin suscripciones ni llaves VAPID)
+  // Modo --resumen --test por línea de comandos real (sin suscripciones ni llaves VAPID).
+  // El proceso hijo usa el reloj real, así que sus entrenos se fechan relativo a hoy
+  // (hora de Costa Rica): hoy y hace 2 días siguen dentro de la ventana de 7 días
+  // aunque la medianoche caiga entre este cálculo y la ejecución del script.
+  const todayKey = localParts(new Date()).date;
+  const cliData = {
+    ...sampleData,
+    workouts: {
+      v: [
+        { id: "w1", type: "Fuerza", kind: "strength", start: `${shiftDateKey(todayKey, -2)}T19:00:00Z`, min: 45 },
+        { id: "w2", type: "Correr", kind: "run", start: `${todayKey}T18:30:00Z`, min: 30 },
+      ],
+      at: 1,
+    },
+  };
+  fs.writeFileSync(path.join(root, "data.json"), JSON.stringify(cliData));
   const scriptPath = path.resolve("scripts/recordatorios.mjs");
   const out = execFileSync(process.execPath, [scriptPath, "--resumen", "--test"], { cwd: root, encoding: "utf8" });
   assert.match(out, /Resumen semanal/);
   assert.match(out, /Entrenos \(7d\): 2 \(75 min\)/);
   assert.match(out, /Fuerza: 1 \(45 min\), Running: 1 \(30 min\)/);
 
-  // Modo --resumen enviando a suscriptores
+  // Modo --resumen enviando a suscriptores: fechas fijas y `now` inyectado
+  fs.writeFileSync(path.join(root, "data.json"), JSON.stringify(sampleData));
   fs.mkdirSync(path.join(root, "push", "subs"), { recursive: true });
   fs.writeFileSync(
     path.join(root, "push", "subs", "a.json"),
