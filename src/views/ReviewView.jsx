@@ -242,7 +242,14 @@ export function ReviewView({ wp, log, habits, habitDefs, wins, setWins, reviews,
               <span className="text-xs text-muted">{summary.dopamine.cheap === 1 ? "barata" : "baratas"}</span>
             </span>
           </div>
-          <div className="mt-0.5 text-xs text-muted">registro semanal</div>
+          <div className="mt-0.5 text-xs text-muted">
+            registro semanal
+            {summary.dopamine.failedDays > 0 && (
+              <span className="font-semibold text-warn">
+                {" "}· {summary.dopamine.failedDays} {summary.dopamine.failedDays === 1 ? "día fallado" : "días fallados"}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="rounded-2xl border border-line bg-surface p-4">

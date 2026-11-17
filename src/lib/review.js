@@ -198,7 +198,7 @@ export function buildWeekReview({
     sessions: progress.sessions,
     minutes: progress.minutes,
     habits: progress.habits,
-    dopamine: { good: dopa.goodWeek, cheap: dopa.cheapWeek, items: dopa.items },
+    dopamine: { good: dopa.goodWeek, cheap: dopa.cheapWeek, failedDays: dopa.failedDays, items: dopa.items },
     sleep: sleepStats,
     wins: weekWins,
     review: (reviews && reviews[mk]) || null,
