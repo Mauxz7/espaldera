@@ -1,5 +1,6 @@
 // Elementos de dopamina buena y barata (editables; clave persistida `dopamineDefs`).
-// `kind: "cheap"` tiene límite diario (`limit`); `kind: "good"` vota por una identidad (`identity`).
+// `kind: "cheap"` tiene límite diario (`limit`; 0 = tolerancia cero: marcarlo falla el día);
+// `kind: "good"` vota por una identidad (`identity`) y puede tener meta diaria (`goal`; 0 = sin meta).
 export const DEFAULT_DOPAMINE_DEFS = [
   { id: "d_social", label: "Redes sociales (15 min)", kind: "cheap", limit: 2 },
   { id: "d_shorts", label: "Videos cortos (reels/TikTok)", kind: "cheap", limit: 1 },

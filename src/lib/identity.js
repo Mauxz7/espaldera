@@ -1,11 +1,11 @@
 // Votos por identidad (sin interfaz, con pruebas en tests/identity.test.mjs).
 // Cada hábito cumplido es un voto para la identidad del hábito; cada sesión
 // registrada en `log` (o cubierta por un entreno de Fitbit) es un voto para «Atleta»;
-// cada elemento de dopamina buena con identidad registrado al menos una vez en el día suma 1 voto;
+// cada elemento de dopamina buena con identidad que cumple su meta del día (1 registro si no tiene meta) suma 1 voto;
 // cada noche de descanso según Fitbit (7 h o más, o dormirse antes de las 11 p.m.) es un voto para «Persona descansada».
 import { DEFAULT_HABIT_DEFS, isHabitDoneOrMini } from "../data/habits.js";
 import { DEFAULT_IDENTITIES, IDENTITY_COLORS, ATHLETE_ID, habitIdentity } from "../data/identities.js";
-import { normalizeDopamineDefs } from "./dopamine.js";
+import { normalizeDopamineDefs, isGoalMet } from "./dopamine.js";
 import { isRested } from "./sleep.js";
 
 export const REST_ID = "descanso";
@@ -50,7 +50,7 @@ export function weekVotes({ keys, todayIdx, habits, habitDefs, identities, log, 
     defs.forEach((d) => { if (isHabitDoneOrMini(d, h)) add(habitIdentity(d)); });
     if ((log && log[k]) || (fromFitbit && fromFitbit[i])) add(ATHLETE_ID); // sesión hecha en Shift o registrada solo con Fitbit
     const dopaDay = (dopamine || {})[k] || {};
-    dopaDefs.forEach((d) => { if (Number(dopaDay[d.id]) > 0) add(d.identity); });
+    dopaDefs.forEach((d) => { if (isGoalMet(d, Number(dopaDay[d.id]) || 0)) add(d.identity); });
     if (isRested(sleep && sleep[k])) add(REST_ID); // la noche que terminó ese día
     dayVotes.forEach((n, id) => { const r = byId.get(id); r.votes += n; r.days += 1; });
   }

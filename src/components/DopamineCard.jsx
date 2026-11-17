@@ -1,3 +1,4 @@
+import { Ban } from "lucide-react";
 import { usePersisted } from "../lib/storage.js";
 import { dkey, addDays, mondayOf } from "../lib/dates.js";
 import { DEFAULT_DOPAMINE_DEFS } from "../data/dopamine.js";
@@ -17,7 +18,7 @@ export function DopamineCard() {
   const keys = Array.from({ length: 7 }, (_, i) => dkey(addDays(mon, i)));
   const todayIdx = (now.getDay() + 6) % 7;
 
-  const { items, goodWeek, cheapWeek } = dopamineWeekStats({
+  const { items, goodWeek, cheapWeek, failedDays, failedToday } = dopamineWeekStats({
     keys,
     todayIdx,
     dopamine,
@@ -42,8 +43,31 @@ export function DopamineCard() {
           {goodWeek === 1 ? "buena" : "buenas"} ·{" "}
           <span className="font-mono font-semibold tabular-nums text-warn">{cheapWeek}</span>{" "}
           {cheapWeek === 1 ? "barata" : "baratas"}
+          {failedDays > 0 && (
+            <>
+              {" "}·{" "}
+              <span className="font-mono font-semibold tabular-nums text-warn">{failedDays}</span>{" "}
+              {failedDays === 1 ? "día fallado" : "días fallados"}
+            </>
+          )}
         </p>
       </div>
+
+      {failedToday.length > 0 && (
+        <div
+          role="status"
+          className="mt-3 flex items-start gap-2.5 rounded-xl border border-warn/70 bg-warn/15 p-3 text-warn"
+        >
+          <Ban size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+          <div className="min-w-0">
+            <div className="font-display text-sm font-semibold uppercase tracking-wide">Día fallado</div>
+            <p className="mt-0.5 text-xs text-fg/80">
+              Marcaste {failedToday.map((it) => `«${it.label}»`).join(", ")}, con límite 0. Si fue un error,
+              toca −1 y el día vuelve a contar.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         {/* Dopamina buena */}
@@ -61,7 +85,7 @@ export function DopamineCard() {
                 <div
                   key={it.id}
                   className={`flex items-center gap-2 rounded-xl border p-2.5 transition ${
-                    it.today > 0 ? "border-good/40 bg-good/10" : "border-line bg-surface2"
+                    it.goalMet ? "border-good/40 bg-good/10" : "border-line bg-surface2"
                   }`}
                 >
                   <div className="min-w-0 flex-1">
@@ -74,8 +98,9 @@ export function DopamineCard() {
                       {it.label}
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
-                      <span className={`font-mono tabular-nums ${it.today > 0 ? "font-semibold text-good" : ""}`}>
+                      <span className={`font-mono tabular-nums ${it.goalMet ? "font-semibold text-good" : ""}`}>
                         hoy {it.today}
+                        {it.goal > 0 ? ` de ${it.goal}` : ""}
                       </span>
                       <span className="font-mono tabular-nums">· sem {it.week}</span>
                     </div>
@@ -132,7 +157,7 @@ export function DopamineCard() {
                   </div>
                   <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs">
                     <span className={`font-mono tabular-nums ${it.overLimit ? "font-semibold text-warn" : "text-muted"}`}>
-                      hoy {it.today} de {it.limit}
+                      {it.zeroTolerance ? (it.today > 0 ? `hoy ${it.today} · día fallado` : "límite 0") : `hoy ${it.today} de ${it.limit}`}
                     </span>
                     <span className="font-mono tabular-nums text-muted">· sem {it.week}</span>
                   </div>

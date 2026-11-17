@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
-import { normalizeDopamineDefs, newDopamineItem } from "../lib/dopamine.js";
+import { normalizeDopamineDefs, newDopamineItem, parseDopamineCount } from "../lib/dopamine.js";
 
 // Editor de elementos de dopamina buena y barata. Vive en Ajustes.
 export function DopamineEditor({ defs, setDefs, identities }) {
@@ -10,10 +10,11 @@ export function DopamineEditor({ defs, setDefs, identities }) {
 
   const [editingId, setEditingId] = useState(null); // null | "new" | id
   const [confirmId, setConfirmId] = useState(null);
-  const [form, setForm] = useState({ label: "", kind: "good", limit: 1, identity: "" });
+  // `limit` y `goal` se guardan como texto mientras se escriben, para poder borrar el campo o poner 0.
+  const [form, setForm] = useState({ label: "", kind: "good", limit: "1", goal: "0", identity: "" });
 
   const startNew = () => {
-    setForm({ label: "", kind: "good", limit: 1, identity: "" });
+    setForm({ label: "", kind: "good", limit: "1", goal: "0", identity: "" });
     setEditingId("new");
     setConfirmId(null);
   };
@@ -22,7 +23,8 @@ export function DopamineEditor({ defs, setDefs, identities }) {
     setForm({
       label: it.label,
       kind: it.kind,
-      limit: it.limit || 1,
+      limit: String(it.kind === "cheap" ? it.limit : 1),
+      goal: String(it.kind === "good" ? it.goal : 0),
       identity: it.identity || "",
     });
     setEditingId(it.id);
@@ -34,8 +36,8 @@ export function DopamineEditor({ defs, setDefs, identities }) {
     if (!label) return;
     const isCheap = form.kind === "cheap";
     const base = isCheap
-      ? { label, kind: "cheap", limit: Math.max(1, parseInt(form.limit, 10) || 1) }
-      : { label, kind: "good", identity: form.identity || null };
+      ? { label, kind: "cheap", limit: parseDopamineCount(form.limit, 1) }
+      : { label, kind: "good", identity: form.identity || null, goal: parseDopamineCount(form.goal, 0) };
 
     if (editingId === "new") {
       const created = { ...newDopamineItem(list, form.kind), ...base };
@@ -58,7 +60,7 @@ export function DopamineEditor({ defs, setDefs, identities }) {
         <div className="min-w-0">
           <h2 className="font-display text-lg font-semibold uppercase tracking-wide">Dopamina</h2>
           <p className="text-sm text-muted">
-            Edita tu lista de dopamina buena y barata, sus límites diarios o la identidad por la que vota.
+            Edita tu lista de dopamina buena y barata, sus límites y metas diarias o la identidad por la que vota.
           </p>
         </div>
         {editingId === null && (
@@ -128,13 +130,36 @@ export function DopamineEditor({ defs, setDefs, identities }) {
               Límite diario (veces)
               <input
                 type="number"
-                min="1"
+                inputMode="numeric"
+                min="0"
                 value={form.limit}
-                onChange={(e) => setForm({ ...form, limit: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                onChange={(e) => setForm({ ...form, limit: e.target.value })}
                 className="mt-1 min-h-[44px] w-full rounded-lg border border-line bg-surface px-3 py-2 font-mono text-sm text-fg focus:border-accent focus:outline-none"
               />
+              <span className="mt-1 block">
+                {parseDopamineCount(form.limit, 1) === 0
+                  ? "Límite 0 = tolerancia cero: si lo marcas, el día queda fallado."
+                  : "Pasarte del límite lo marca en naranja. Con 0, marcarlo falla el día."}
+              </span>
             </label>
           ) : (
+            <>
+            <label className="block text-xs text-muted">
+              Meta diaria (veces)
+              <input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                value={form.goal}
+                onChange={(e) => setForm({ ...form, goal: e.target.value })}
+                className="mt-1 min-h-[44px] w-full rounded-lg border border-line bg-surface px-3 py-2 font-mono text-sm text-fg focus:border-accent focus:outline-none"
+              />
+              <span className="mt-1 block">
+                {parseDopamineCount(form.goal, 0) === 0
+                  ? "Meta 0 = sin meta: con registrarlo una vez ya suma el voto del día."
+                  : "Suma el voto del día cuando llegas a la meta."}
+              </span>
+            </label>
             <label className="block text-xs text-muted">
               Identidad (1 voto por día que lo registres)
               <select
@@ -150,6 +175,7 @@ export function DopamineEditor({ defs, setDefs, identities }) {
                 ))}
               </select>
             </label>
+            </>
           )}
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -185,11 +211,20 @@ export function DopamineEditor({ defs, setDefs, identities }) {
                       {it.kind === "cheap" ? "Barata" : "Buena"}
                     </span>
                     {it.kind === "cheap" ? (
-                      <span className="font-mono">· límite {it.limit}/día</span>
-                    ) : idObj ? (
-                      <span>· {idObj.emoji ? `${idObj.emoji} ` : ""}{idObj.label}</span>
+                      it.limit === 0 ? (
+                        <span className="font-semibold text-warn">· tolerancia cero</span>
+                      ) : (
+                        <span className="font-mono">· límite {it.limit}/día</span>
+                      )
                     ) : (
-                      <span>· sin identidad</span>
+                      <>
+                        {idObj ? (
+                          <span>· {idObj.emoji ? `${idObj.emoji} ` : ""}{idObj.label}</span>
+                        ) : (
+                          <span>· sin identidad</span>
+                        )}
+                        {it.goal > 0 && <span className="font-mono">· meta {it.goal}/día</span>}
+                      </>
                     )}
                   </div>
                 </div>
