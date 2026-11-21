@@ -1,23 +1,86 @@
-import { useState, useRef } from "react";
-import { X, Check, ChevronDown, Info, ArrowLeftRight, Undo2, History, Pencil, TrendingUp, Maximize2 } from "lucide-react";
+import { useState, useRef, useEffect, useId, useMemo } from "react";
+import { X, Check, ChevronDown, Info, ArrowLeftRight, Undo2, History, Pencil, TrendingUp, Maximize2, SkipForward, RotateCcw } from "lucide-react";
 import { fmtShort } from "../lib/dates.js";
 import { EQ, effSets, effRir } from "../data/program.js";
-import { SUB_KIND, SUBS } from "../data/subs.js";
+import { SUB_KIND, PATTERNS } from "../data/subs.js";
+import { getAlternativesForExercise } from "../lib/routines.js";
 import { parseTargetReps } from "../lib/setLog.js";
 import { suggestProgression } from "../lib/progression.js";
 import { Chip } from "./ui.jsx";
 
-export function SwapModal({ ex, week, current, onPick, onClose }) {
-  const alts = SUBS[ex.id] || [];
-  const row = (item, isOriginal) => {
+export function SwapModal({ ex, week, current, skipped = false, onPick, onSkip, onClose }) {
+  const titleId = useId();
+  const dialogRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const [tab, setTab] = useState("suggested");
+  const defaultPattern = ex.pattern && PATTERNS[ex.pattern] ? ex.pattern : "all";
+  const [patternFilter, setPatternFilter] = useState(defaultPattern);
+
+  const { suggested, samePattern, otherPatterns } = useMemo(() => getAlternativesForExercise(ex), [ex]);
+  const patternKeys = useMemo(() => {
+    const keys = [];
+    if (ex.pattern && PATTERNS[ex.pattern] && samePattern.length) keys.push(ex.pattern);
+    for (const k of Object.keys(otherPatterns)) keys.push(k);
+    return keys;
+  }, [ex.pattern, samePattern.length, otherPatterns]);
+
+  useEffect(() => {
+    setTab("suggested");
+    setPatternFilter(ex.pattern && PATTERNS[ex.pattern] ? ex.pattern : "all");
+  }, [ex.id, ex.pattern]);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    dialog.setAttribute("closedby", "any");
+    if (!dialog.open) dialog.showModal();
+    const onNativeClose = () => onCloseRef.current();
+    dialog.addEventListener("close", onNativeClose);
+
+    let cleanupFallback;
+    if (!("closedBy" in HTMLDialogElement.prototype)) {
+      let pressedOutside = false;
+      const outside = (e) => {
+        const r = dialog.getBoundingClientRect();
+        return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+      };
+      const onDown = (e) => { pressedOutside = outside(e); };
+      const onUp = (e) => { if (pressedOutside && outside(e)) dialog.close(); };
+      dialog.addEventListener("pointerdown", onDown);
+      dialog.addEventListener("pointerup", onUp);
+      cleanupFallback = () => {
+        dialog.removeEventListener("pointerdown", onDown);
+        dialog.removeEventListener("pointerup", onUp);
+      };
+    }
+
+    return () => {
+      dialog.removeEventListener("close", onNativeClose);
+      if (cleanupFallback) cleanupFallback();
+      if (dialog.open) dialog.close();
+    };
+  }, []);
+
+  const handleTabKeyDown = (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Home" && e.key !== "End") return;
+    e.preventDefault();
+    const next = tab === "suggested" ? "library" : "suggested";
+    setTab(next);
+    const btn = e.currentTarget.querySelector(`[data-swap-tab="${next}"]`);
+    if (btn) btn.focus();
+  };
+
+  const row = (item, isOriginal, badgeText = null) => {
     const active = isOriginal ? !current : current === item.id;
     const rirOrig = effRir(ex, week);
     const rirNew = effRir({ rir: item.rir }, week);
     return (
-      <button key={isOriginal ? "original" : item.id} onClick={() => onPick(isOriginal ? null : item.id)} aria-pressed={active}
+      <button key={isOriginal ? "original" : item.id} type="button" onClick={() => onPick(isOriginal ? null : item.id)} aria-pressed={active}
         className={`w-full rounded-2xl border p-3 text-left transition ${active ? "border-accent bg-accent/10" : "border-line bg-surface2 hover:border-muted"}`}>
         <div className="flex flex-wrap items-center gap-1.5">
-          {isOriginal ? <Chip>Original</Chip> : <Chip tone={item.kind === "eq" ? "good" : "cool"}>{SUB_KIND[item.kind]}</Chip>}
+          {isOriginal ? <Chip>Original</Chip> : <Chip tone={item.kind === "eq" ? "good" : "cool"}>{badgeText || SUB_KIND[item.kind]}</Chip>}
           {active && <Chip tone="accent"><Check size={11} />En uso</Chip>}
         </div>
         <div className="mt-1.5 text-[15px] font-semibold leading-snug">{item.name}</div>
@@ -31,23 +94,86 @@ export function SwapModal({ ex, week, current, onPick, onClose }) {
       </button>
     );
   };
+
+  const libraryItems = useMemo(() => {
+    if (patternFilter === "all") {
+      const groups = [];
+      if (samePattern.length && ex.pattern) groups.push({ key: ex.pattern, label: PATTERNS[ex.pattern], list: samePattern });
+      for (const k of Object.keys(otherPatterns)) groups.push({ key: k, label: PATTERNS[k], list: otherPatterns[k] });
+      return groups;
+    }
+    if (patternFilter === ex.pattern) {
+      return samePattern.length ? [{ key: ex.pattern, label: PATTERNS[ex.pattern], list: samePattern }] : [];
+    }
+    const list = otherPatterns[patternFilter] || [];
+    return list.length ? [{ key: patternFilter, label: PATTERNS[patternFilter], list }] : [];
+  }, [patternFilter, samePattern, otherPatterns, ex.pattern]);
+
   return (
-    <div className="sheet-backdrop fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center" onClick={onClose}>
-      <div className="sheet max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-line bg-surface p-5 md:rounded-3xl" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Sustituir ejercicio">
-        <div className="mb-4 flex items-start justify-between gap-3">
+    <dialog ref={dialogRef} aria-labelledby={titleId} className="sheet-dialog sheet">
+      <div className="flex min-h-0 flex-1 flex-col p-5 pb-[max(20px,env(safe-area-inset-bottom))]">
+        <div className="mb-3 flex shrink-0 items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">Sustituir / Alternativa · {ex.block}</div>
-            <h2 className="font-display text-2xl font-semibold uppercase leading-none">{ex.name}</h2>
+            <h2 id={titleId} className="font-display text-2xl font-semibold uppercase leading-none">{ex.name}</h2>
             <p className="mt-1 text-xs text-muted">Las series se mantienen ({effSets(ex, week)}). Reps, tempo y RIR se ajustan solos.</p>
           </div>
-          <button onClick={onClose} className="rounded-full p-1 text-muted hover:text-fg" aria-label="Cerrar"><X size={22} /></button>
+          <button type="button" onClick={() => dialogRef.current?.close()} className="rounded-full p-1 text-muted hover:text-fg" aria-label="Cerrar"><X size={22} /></button>
         </div>
-        <div className="space-y-2">
-          {row(ex, true)}
-          {alts.map((a) => row(a, false))}
+
+        <div role="tablist" aria-label="Opciones de sustitución" onKeyDown={handleTabKeyDown} className="mb-3 flex shrink-0 gap-2 border-b border-line pb-2">
+          <button type="button" role="tab" id="swap-tab-suggested" data-swap-tab="suggested" aria-selected={tab === "suggested"} tabIndex={tab === "suggested" ? 0 : -1} onClick={() => setTab("suggested")}
+            className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${tab === "suggested" ? "text-accent" : "text-muted hover:text-fg"}`}>
+            Sugeridas ({suggested.length})
+          </button>
+          <button type="button" role="tab" id="swap-tab-library" data-swap-tab="library" aria-selected={tab === "library"} tabIndex={tab === "library" ? 0 : -1} onClick={() => setTab("library")}
+            className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${tab === "library" ? "text-accent" : "text-muted hover:text-fg"}`}>
+            Biblioteca por patrón
+          </button>
         </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
+          <div role="tabpanel" aria-labelledby="swap-tab-suggested" hidden={tab !== "suggested"} className="space-y-2">
+            {row(ex, true)}
+            {suggested.map((a) => row(a, false))}
+          </div>
+
+          <div role="tabpanel" aria-labelledby="swap-tab-library" hidden={tab !== "library"}>
+            <div className="no-scrollbar mb-3 flex gap-1.5 overflow-x-auto pb-1">
+              {patternKeys.map((k) => (
+                <button key={k} type="button" onClick={() => setPatternFilter(k)} aria-pressed={patternFilter === k}
+                  className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium transition ${patternFilter === k ? "border-accent bg-accent/15 text-accent" : "border-line bg-surface2 text-muted hover:text-fg"}`}>
+                  {PATTERNS[k]}
+                </button>
+              ))}
+              <button type="button" onClick={() => setPatternFilter("all")} aria-pressed={patternFilter === "all"}
+                className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium transition ${patternFilter === "all" ? "border-accent bg-accent/15 text-accent" : "border-line bg-surface2 text-muted hover:text-fg"}`}>
+                Todos
+              </button>
+            </div>
+            <div className="space-y-3">
+              {libraryItems.length ? libraryItems.map((group) => (
+                <div key={group.key} className="space-y-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-widest text-muted">{group.label}</div>
+                  {group.list.map((item) => row(item, false, PATTERNS[item.pattern]))}
+                </div>
+              )) : (
+                <p className="py-4 text-center text-xs text-muted">No hay opciones adicionales en este patrón fuera de las sugeridas.</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {onSkip && (
+          <div className="mt-3 shrink-0 border-t border-line pt-3">
+            <button type="button" onClick={() => { onSkip(); dialogRef.current?.close(); }}
+              className={`flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-semibold transition ${skipped ? "border-accent/50 bg-accent/10 text-accent hover:bg-accent/20" : "border-line bg-surface2 text-muted hover:border-warn hover:text-warn"}`}>
+              {skipped ? <><RotateCcw size={14} />Restaurar este bloque hoy</> : <><SkipForward size={14} />Saltar este bloque hoy</>}
+            </button>
+          </div>
+        )}
       </div>
-    </div>
+    </dialog>
   );
 }
 
@@ -61,9 +187,11 @@ export function ExerciseCard({
   alt,
   week,
   done = [],
+  skipped = false,
   onToggle,
   onSwap,
   onRevert,
+  onSkip,
   load,
   onLoad,
   last,
@@ -84,6 +212,25 @@ export function ExerciseCard({
   const count = done.filter(Boolean).length;
   const complete = count >= n;
   const progression = suggestProgression(last, ex.reps, n);
+
+  if (skipped) {
+    return (
+      <article className="rounded-2xl border border-dashed border-line bg-surface/60 p-4">
+        <div className="flex items-center gap-3">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface2 font-display text-base font-semibold text-muted">{ex.block}</div>
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate text-[15px] font-medium text-muted line-through">{ex.name}</h3>
+            <div className="text-xs text-muted">Saltado hoy · no cuenta en el progreso</div>
+          </div>
+          {onSkip && (
+            <button type="button" onClick={onSkip} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-surface2 px-3 py-1.5 text-xs font-medium text-fg hover:border-accent hover:text-accent">
+              <RotateCcw size={13} />Restaurar
+            </button>
+          )}
+        </div>
+      </article>
+    );
+  }
 
   const openEdit = (i) => {
     let initialReps;
@@ -177,8 +324,13 @@ export function ExerciseCard({
       </dl>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button onClick={onSwap} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface2 px-3 py-1.5 text-xs font-medium hover:border-cool hover:text-cool">
-          <ArrowLeftRight size={14} />Sustituir / Alternativa
+          <ArrowLeftRight size={14} />Sustituir
         </button>
+        {onSkip && (
+          <button type="button" onClick={onSkip} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface2 px-2.5 py-1.5 text-xs font-medium text-muted hover:border-warn hover:text-warn" title="Saltar este bloque hoy">
+            <SkipForward size={14} />Saltar
+          </button>
+        )}
         <label className="ml-auto flex items-center gap-1.5 text-xs text-muted">
           Carga
           <input value={load || ""} onChange={(e) => onLoad(e.target.value)} placeholder="ej. 40 kg" maxLength={24}

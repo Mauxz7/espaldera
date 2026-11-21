@@ -86,3 +86,14 @@ test("wins y reviews se sincronizan entre dispositivos", async () => {
   assert.deepEqual(await b.read("wins"), [{ id: "win_1", date: "2026-11-16", text: "Primer logro" }]);
   assert.deepEqual(await b.read("reviews"), { "2026-11-16": { good: "Buen inicio", adjust: "Dormir antes", at: 4000 } });
 });
+
+test("routineVariants y skips se sincronizan entre dispositivos", async () => {
+  const a = await device("j");
+  const b = await device("k");
+  await a.write("routineVariants", { d1: "trx", d4: "express" }, 5000);
+  await a.write("skips", { "2026-11-21": { d4: { d4c1: true } } }, 5000);
+  await a.sync();
+  await b.sync();
+  assert.deepEqual(await b.read("routineVariants"), { d1: "trx", d4: "express" });
+  assert.deepEqual(await b.read("skips"), { "2026-11-21": { d4: { d4c1: true } } });
+});

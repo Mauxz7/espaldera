@@ -47,6 +47,10 @@ test("buildCalPlan: solo días con sesión, hora de mañana o de noche y duraci�
   assert.match(items[0].title, /^🏋️ Día 1 · /);
   assert.ok(items[0].min > 0 && items[0].desc.includes("•"));
   assert.equal(planFile(items), planFile(items)); // estable: no cambia si el plan no cambia
+
+  const custom = buildCalPlan([{ date: "2026-11-21", rid: "d4", office: false, evening: false }], { d4: "express" });
+  assert.equal(custom[0].min, 30);
+  assert.match(custom[0].title, /Metabólico Express/);
 });
 
 test("fechas y horas de Costa Rica", () => {

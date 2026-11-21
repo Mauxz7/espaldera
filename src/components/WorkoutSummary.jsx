@@ -5,7 +5,7 @@ import { formatDuration, formatKg } from "../lib/workout.js";
  * Hoja de resumen al terminar: duración, series hechas, carga total y marcas nuevas frente a la última vez.
  * summary: resultado de buildWorkoutSummary (lib/workout.js).
  */
-export function WorkoutSummary({ routine, summary, logged, onRegister, onContinue, onClose, onDone }) {
+export function WorkoutSummary({ routine, summary, logged, skippedCount = 0, onRegister, onContinue, onClose, onDone }) {
   const { durationMs, setsDone, setsTotal, volume, records, complete } = summary;
   const stat = (Icon, label, value, sub) => (
     <div className="min-w-0 rounded-2xl bg-surface2 p-3">
@@ -23,6 +23,7 @@ export function WorkoutSummary({ routine, summary, logged, onRegister, onContinu
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">{routine.short} · Resumen</div>
             <h2 className="font-display text-3xl font-semibold uppercase leading-none">{complete ? "Rutina completa" : "Entreno terminado"}</h2>
             <p className="mt-1 truncate text-sm text-muted">{routine.name}</p>
+            {skippedCount > 0 && <p className="mt-0.5 text-xs text-muted">{skippedCount === 1 ? "1 bloque saltado hoy" : `${skippedCount} bloques saltados hoy`}</p>}
           </div>
           <button type="button" onClick={onClose} className="-mr-2 -mt-1 grid h-12 w-12 shrink-0 place-items-center rounded-full text-muted hover:text-fg" aria-label="Cerrar resumen"><X size={22} /></button>
         </div>

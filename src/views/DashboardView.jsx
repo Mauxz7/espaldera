@@ -255,7 +255,7 @@ export function WorkoutsSection({ workouts, log }) {
           <ul className="divide-y divide-line">
             {recent.map((w) => {
               const Icon = KIND_ICON[w.kind] || Activity;
-              const logged = log && log[w.date] && log[w.date].r ? routineById(log[w.date].r) : null;
+              const logged = log && log[w.date] && log[w.date].r ? routineById(log[w.date].r, undefined, log[w.date].v) : null;
               return (
                 <li key={w.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                   <div className="flex min-w-0 items-center gap-2.5">

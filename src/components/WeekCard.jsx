@@ -1,14 +1,15 @@
 import { Moon, Shuffle, Building2, Home, Watch } from "lucide-react";
 import { dkey, addDays, DAYS, DAYS_LONG } from "../lib/dates.js";
 import { routineById } from "../data/program.js";
+import { getActiveRoutine } from "../lib/routines.js";
 import { TAG } from "../lib/planner.js";
 
-export function WeekCard({ wp, log }) {
+export function WeekCard({ wp, log, routineVariants }) {
   const today = dkey();
   const t = wp.info(today);
   const tm = wp.info(dkey(addDays(new Date(), 1)));
   const fitDays = wp.keys.map((k, i) => ({ i, f: wp.fit && wp.fit[i] })).filter((d) => d.f);
-  const line = (x) => `${x.office ? "oficina" : "casa"} · ${x.rid ? routineById(x.rid).name + (x.evening ? " (de noche)" : "") : "descanso"} · despertar ${x.wake}`;
+  const line = (x) => `${x.office ? "oficina" : "casa"} · ${x.rid ? getActiveRoutine(x.rid, { routineVariants }).name + (x.evening ? " (de noche)" : "") : "descanso"} · despertar ${x.wake}`;
   return (
     <section className="rounded-2xl border border-line bg-surface p-4">
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -23,7 +24,7 @@ export function WeekCard({ wp, log }) {
           const fit = wp.fit && wp.fit[i];
           const viaFitbit = !l && wp.fromFitbit && wp.fromFitbit[i];
           const missed = !l && !viaFitbit && planned && i < wp.todayIdx;
-          const ring = l ? (routineById(l.r).low ? "bg-cool text-bg" : "bg-accent text-accentInk")
+          const ring = l ? (routineById(l.r, undefined, l.v).low ? "bg-cool text-bg" : "bg-accent text-accentInk")
             : viaFitbit ? "bg-good text-bg"
             : planned ? `border border-dashed ${missed ? "border-line text-muted/60" : "border-accent text-accent"}`
             : isToday ? "border border-line text-muted" : "bg-surface2 text-muted";
@@ -62,7 +63,7 @@ export function WeekCard({ wp, log }) {
               <li key={i} className="flex flex-wrap gap-x-1.5">
                 <span className="text-muted">{DAYS[i]}:</span>
                 <span>{f.list.map((w) => `${w.type} ${w.min} min`).join(" · ")}</span>
-                {wp.fromFitbit && wp.fromFitbit[i] && !log[wp.keys[i]] && <span className="text-good">→ cuenta como {routineById(wp.fromFitbit[i]).name}</span>}
+                {wp.fromFitbit && wp.fromFitbit[i] && !log[wp.keys[i]] && <span className="text-good">→ cuenta como {getActiveRoutine(wp.fromFitbit[i], { routineVariants }).name}</span>}
               </li>
             ))}
           </ul>

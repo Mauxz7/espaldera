@@ -1,6 +1,6 @@
 import { Flame, AlarmClock } from "lucide-react";
 import { dkey, fromKey, addDays, DAYS, DAYS_LONG, clockAm, fmtShort } from "../lib/dates.js";
-import { routineById } from "../data/program.js";
+import { getActiveRoutine } from "../lib/routines.js";
 import { DEFAULT_HABIT_DEFS, reqDone, isHabitDoneOrMini, getHabitIcon } from "../data/habits.js";
 import { computeAllHabitStats } from "../lib/habitStats.js";
 import { Chip } from "../components/ui.jsx";
@@ -15,8 +15,8 @@ export const NIGHT = [
   { t: "10:50 p.m.", h: "Luces fuera", d: "De 10:50 p.m. a 6:30 a.m. son 7 h 40 min en cama, cerca de tu promedio de sueño reparador. Los días sin entreno la alarma pasa a las 7:00." },
 ];
 
-export function morningSteps(info) {
-  const r = info.rid ? routineById(info.rid) : null;
+export function morningSteps(info, routineVariants = null) {
+  const r = info.rid ? getActiveRoutine(info.rid, { routineVariants }) : null;
   const leave = { t: "7:50 a.m.", h: "Salida a la oficina", d: "Traslado de 7:50 a 8:45." };
   if (r && info.evening) {
     return [
@@ -49,7 +49,7 @@ export const PROTEIN_RULES = [
   { h: "Kit de emergencia anti comida rápida", d: "En la mochila: batido listo para tomar, atún en lata, maní y fruta. En casa: huevos, queso cottage, tortillas y frijoles para una cena de 10 minutos." },
 ];
 
-export function HabitsView({ habits, setHabits, habitDefs, tomorrow, tonight }) {
+export function HabitsView({ habits, setHabits, habitDefs, tomorrow, tonight, routineVariants }) {
   const defs = habitDefs || DEFAULT_HABIT_DEFS;
   const reqDefs = defs.filter((d) => !d.archived && (!d.group || d.group === "req"));
   const optDefs = defs.filter((d) => !d.archived && d.group === "opt");
@@ -196,7 +196,7 @@ export function HabitsView({ habits, setHabits, habitDefs, tomorrow, tonight }) 
         <h2 className="mb-3 font-display text-lg font-semibold uppercase tracking-wide">De las 10:00 p.m. a la espaldera</h2>
         {tonight.rid && tonight.evening && (
           <p className="mb-3 rounded-xl border border-cool/40 bg-cool/10 px-3 py-2 text-sm">
-            <span className="font-semibold text-cool">Hoy entrenas de noche:</span> {routineById(tonight.rid).name}. Sin clase, entrena al llegar, termina al menos una hora antes de las 10:30 p.m. y retoma esta rutina desde la cena.
+            <span className="font-semibold text-cool">Hoy entrenas de noche:</span> {getActiveRoutine(tonight.rid, { routineVariants }).name}. Sin clase, entrena al llegar, termina al menos una hora antes de las 10:30 p.m. y retoma esta rutina desde la cena.
           </p>
         )}
         <ol className="relative space-y-4 border-l border-line pl-5">
@@ -224,7 +224,7 @@ export function HabitsView({ habits, setHabits, habitDefs, tomorrow, tonight }) 
           <Chip tone={tomorrow.rid ? "good" : "plain"}>{tomorrow.rid ? (tomorrow.evening ? "Entreno de noche · 7:00" : "Entreno · 6:30") : "Descanso · 7:00"}</Chip>
         </h3>
         <ol className="relative space-y-4 border-l border-line pl-5">
-          {morningSteps(tomorrow).map((s) => (
+          {morningSteps(tomorrow, routineVariants).map((s) => (
             <li key={s.t} className="relative">
               <span className="absolute -left-[25px] top-1.5 h-2.5 w-2.5 rounded-full bg-accent" />
               <div className="flex flex-wrap items-baseline gap-x-3">

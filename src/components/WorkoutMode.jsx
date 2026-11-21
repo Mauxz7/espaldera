@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Check, ChevronLeft, ChevronRight, ArrowLeftRight, History, TrendingUp, Info, ChevronDown, Minus, Plus, Timer, Flag, Trash2 } from "lucide-react";
+import { X, Check, ChevronLeft, ChevronRight, ArrowLeftRight, History, TrendingUp, Info, ChevronDown, Minus, Plus, Timer, Flag, Trash2, SkipForward } from "lucide-react";
 import { fmtShort } from "../lib/dates.js";
 import { effRir } from "../data/program.js";
 import { nextPendingSet, nextPendingExercise, suggestSet, formatClock } from "../lib/workout.js";
@@ -47,13 +47,25 @@ function SetEditor({ item, setIndex, isDone, onSave, onRemove }) {
  * Modo entreno a pantalla completa: un ejercicio a la vez.
  * items: [{ ex, view, alt, n, done, series, currentLoad, last, lastLog }] (calculados en TrainView).
  */
-export function WorkoutMode({ routine, week, items, startIndex = 0, session, onSaveSet, onRemoveSet, onSwap, onClose, onFinish }) {
-  const [idx, setIdx] = useState(() => Math.min(Math.max(0, startIndex), items.length - 1));
+export function WorkoutMode({ routine, week, items, startIndex = 0, session, onSaveSet, onRemoveSet, onSwap, onSkip, onClose, onFinish }) {
+  const [idx, setIdx] = useState(() => Math.min(Math.max(0, startIndex), Math.max(0, items.length - 1)));
   const [picked, setPicked] = useState(null); // serie elegida a mano; null = la primera pendiente
   const [rest, setRest] = useState(null); // { endAt, total } solo para mostrar; el temporizador global suena
   const [tips, setTips] = useState(false);
   const [now, setNow] = useState(Date.now());
   const stripRef = useRef(null);
+
+  useEffect(() => {
+    if (items.length === 0) {
+      onClose();
+      return;
+    }
+    if (idx >= items.length) {
+      setIdx(items.length - 1);
+      setPicked(null);
+      setTips(false);
+    }
+  }, [items.length, idx, onClose]);
 
   // La lista de abajo no se desplaza mientras el modo está abierto.
   useEffect(() => {
@@ -182,8 +194,11 @@ export function WorkoutMode({ routine, week, items, startIndex = 0, session, onS
             </div>
           )}
 
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className={`mt-3 grid gap-2 ${onSkip ? "grid-cols-3" : "grid-cols-2"}`}>
             <button type="button" onClick={() => onSwap(ex.id)} className="inline-flex h-12 items-center justify-center gap-1.5 rounded-xl border border-line bg-surface text-sm font-medium hover:border-cool hover:text-cool"><ArrowLeftRight size={16} />Sustituir</button>
+            {onSkip && (
+              <button type="button" onClick={() => onSkip(ex.id)} className="inline-flex h-12 items-center justify-center gap-1.5 rounded-xl border border-line bg-surface text-sm font-medium text-muted hover:border-warn hover:text-warn"><SkipForward size={16} />Saltar</button>
+            )}
             <button type="button" onClick={() => setTips((t) => !t)} aria-expanded={tips} className="inline-flex h-12 items-center justify-center gap-1.5 rounded-xl border border-line bg-surface text-sm font-medium hover:text-fg"><Info size={16} />Tips<ChevronDown size={16} className={`transition-transform ${tips ? "rotate-180" : ""}`} /></button>
           </div>
           {tips && <ul className="mt-2 space-y-1.5 text-sm text-muted">{view.tips.map((t, i) => <li key={i} className="flex gap-2"><span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-accent" />{t}</li>)}</ul>}
