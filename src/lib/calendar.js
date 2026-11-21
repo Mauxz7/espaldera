@@ -7,6 +7,7 @@
 import { useEffect, useMemo } from "react";
 import { Sync, LS, b64e, b64d } from "./storage.js";
 import { routineById } from "../data/program.js";
+import { resolveVariantId } from "./routines.js";
 
 export const MORNING_START = "06:30";
 export const EVENING_START = "19:00";
@@ -30,9 +31,9 @@ export function calExamSoon(calBusy, keys) {
 }
 
 // Lo que se manda al calendario: una entrada por día con sesión, desde hoy.
-export function buildCalPlan(days) {
+export function buildCalPlan(days, routineVariants = null) {
   return (days || []).filter((d) => d && d.rid).map((d) => {
-    const r = routineById(d.rid);
+    const r = routineById(d.rid, undefined, resolveVariantId(d.rid, routineVariants));
     const lines = (r.exercises || []).map((e) => `• ${e.name}: ${e.sets} × ${e.reps}`);
     const head = d.evening ? "Entreno de noche (día de oficina con la noche libre)." : d.office ? "Día de oficina: sesión temprano." : "Día en casa.";
     return {
@@ -75,8 +76,8 @@ export async function pushCalPlan(items, fetchImpl = fetch) {
 
 // Manda el plan unos segundos después del último cambio, y solo cuando la sincronización ya trajo los datos
 // de los otros dispositivos (si no, un teléfono con datos viejos podría mandar un plan viejo).
-export function useCalendarSync(upcoming) {
-  const items = useMemo(() => buildCalPlan(upcoming), [upcoming]);
+export function useCalendarSync(upcoming, routineVariants = null) {
+  const items = useMemo(() => buildCalPlan(upcoming, routineVariants), [upcoming, routineVariants]);
   const text = planFile(items);
   useEffect(() => {
     let t;

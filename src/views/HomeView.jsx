@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { Play, Watch, Check, Coffee, Moon, Building2, Home, BatteryLow, ChevronRight } from "lucide-react";
 import { dkey, DAYS_LONG } from "../lib/dates.js";
 import { usePersisted } from "../lib/storage.js";
-import { routineById, BLOCK_WEEKS } from "../data/program.js";
+import { BLOCK_WEEKS } from "../data/program.js";
+import { getActiveRoutine } from "../lib/routines.js";
 import { weekProgress, todayPlan } from "../lib/home.js";
 import { lastNight, isPoorSleep, fmtSleep } from "../lib/sleep.js";
 import { WeekCard } from "../components/WeekCard.jsx";
@@ -33,7 +34,7 @@ function Ring({ value, goal, label, sub, color }) {
   );
 }
 
-export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBlock, goTrain, wins, setWins, reviews, openReview }) {
+export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBlock, goTrain, wins, setWins, reviews, openReview, routineVariants }) {
   const today = dkey();
   const [workouts] = usePersisted("workouts", []);
   const [fitbit] = useFitbitShortcut();
@@ -41,14 +42,14 @@ export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBloc
   const night = lastNight(sleep, today);
   const info = wp.info(today);
   const plan = todayPlan({ info, logged: log[today], fromFitbit: wp.fromFitbit && wp.fromFitbit[wp.todayIdx] });
-  const routine = plan.rid ? routineById(plan.rid) : null;
+  const routine = plan.rid ? getActiveRoutine(plan.rid, { routineVariants: plan.state === "done" && log[today]?.v ? { [plan.rid]: log[today].v } : routineVariants }) : null;
   const prog = useMemo(
     () => weekProgress({ keys: wp.keys, todayIdx: wp.todayIdx, fixed: wp.fixed, habits, habitDefs, workouts }),
     [wp.keys, wp.todayIdx, wp.fixed, habits, habitDefs, workouts],
   );
   const week = (block && block.week) || 1;
   const bw = BLOCK_WEEKS[week - 1];
-  const next = wp.nextRid && plan.state === "rest" ? routineById(wp.nextRid) : null;
+  const next = wp.nextRid && plan.state === "rest" ? getActiveRoutine(wp.nextRid, { routineVariants }) : null;
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -127,7 +128,7 @@ export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBloc
           </div>
         </section>
 
-        <WeekCard wp={wp} log={log} />
+        <WeekCard wp={wp} log={log} routineVariants={routineVariants} />
       </div>
 
       <aside className="grid min-w-0 content-start gap-4 md:grid-cols-2 xl:grid-cols-1">

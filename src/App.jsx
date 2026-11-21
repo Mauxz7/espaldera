@@ -50,8 +50,10 @@ export default function App() {
   const [lastLoads, setLastLoads] = usePersisted("lastLoads", {});
   const [wins, setWins] = usePersisted("wins", []);
   const [reviews, setReviews] = usePersisted("reviews", {});
+  const [routineVariants, setRoutineVariants] = usePersisted("routineVariants", {});
+  const [skips, setSkips] = usePersisted("skips", {});
   const wp = useWeekPlan(log);
-  useCalendarSync(wp.upcoming); // plan → cal/plan.json → calendario «Shift» (repo privado)
+  useCalendarSync(wp.upcoming, routineVariants); // plan → cal/plan.json → calendario «Shift» (repo privado)
   const [timer, setTimer] = useState(null);
   const [warmup, setWarmup] = useState(false);
 
@@ -133,12 +135,12 @@ export default function App() {
           <SyncBadge />
         </header>
         <div className="mx-auto max-w-6xl">
-          {tab === "home" && <HomeView wp={wp} log={log} habits={habits} setHabits={setHabits} habitDefs={habitDefs} block={block} setBlock={setBlock} goTrain={goTrain} wins={wins} setWins={setWins} reviews={reviews} openReview={openReview} />}
+          {tab === "home" && <HomeView wp={wp} log={log} habits={habits} setHabits={setHabits} habitDefs={habitDefs} block={block} setBlock={setBlock} goTrain={goTrain} wins={wins} setWins={setWins} reviews={reviews} openReview={openReview} routineVariants={routineVariants} />}
           {tab === "review" && <ReviewView wp={wp} log={log} habits={habits} habitDefs={habitDefs} wins={wins} setWins={setWins} reviews={reviews} setReviews={setReviews} onBack={goHome} />}
-          {tab === "train" && <TrainView key={trainRid || "auto"} initialRid={trainRid} sets={sets} setSets={setSets} log={log} setLog={setLog} block={block} swaps={swaps} setSwaps={setSwaps} loads={loads} setLoads={setLoads} lastLoads={lastLoads} setLastLoads={setLastLoads} startTimer={startTimer} openWarmup={() => setWarmup(true)} wp={wp} />}
+          {tab === "train" && <TrainView key={trainRid || "auto"} initialRid={trainRid} sets={sets} setSets={setSets} log={log} setLog={setLog} block={block} swaps={swaps} setSwaps={setSwaps} loads={loads} setLoads={setLoads} lastLoads={lastLoads} setLastLoads={setLastLoads} routineVariants={routineVariants} setRoutineVariants={setRoutineVariants} skips={skips} setSkips={setSkips} startTimer={startTimer} openWarmup={() => setWarmup(true)} wp={wp} />}
           {tab === "fitbit" && <DashboardView health={health} setHealth={setHealth} log={log} />}
           {tab === "settings" && <SettingsView habitDefs={habitDefs} setHabitDefs={setHabitDefs} reminderCard={<ReminderCard rem={rem} />} />}
-          {tab === "habits" && <HabitsView habits={habits} setHabits={setHabits} habitDefs={habitDefs} tomorrow={wp.info(dkey(addDays(new Date(), 1)))} tonight={wp.info(dkey())} />}
+          {tab === "habits" && <HabitsView habits={habits} setHabits={setHabits} habitDefs={habitDefs} tomorrow={wp.info(dkey(addDays(new Date(), 1)))} tonight={wp.info(dkey())} routineVariants={routineVariants} />}
         </div>
       </main>
 
