@@ -12,18 +12,13 @@ export function HabitItem({ hb, bonus, code, value, on, miniOn, missedYesterday,
   const hasAfter = Boolean(hb.after && hb.after.trim());
   const showMissed = Boolean(missedYesterday && !doneAny);
 
-  let cardCls = "border-line bg-surface2";
-  if (fullOn) cardCls = bonus ? "border-cool/40 bg-cool/10" : "border-good/40 bg-good/10";
-  else if (miniOnly) cardCls = bonus ? "border-dashed border-cool/50 bg-cool/5" : "border-dashed border-good/50 bg-good/5";
-  else if (showMissed) cardCls = "border-warn/60 bg-warn/10";
-
-  let dotCls = "bg-surface text-muted";
+  let dotCls = "bg-white/[0.07] text-muted";
   if (fullOn) dotCls = bonus ? "bg-cool text-bg" : "bg-good text-bg";
-  else if (miniOnly) dotCls = bonus ? "border-2 border-cool bg-transparent text-cool" : "border-2 border-good bg-transparent text-good";
+  else if (miniOnly) dotCls = bonus ? "border-2 border-cool bg-cool/10 text-cool" : "border-2 border-good bg-good/10 text-good";
 
   const miniBtnCls = miniOnly
-    ? (bonus ? "border-cool bg-cool/20 text-cool" : "border-good bg-good/20 text-good")
-    : "border-line bg-surface text-muted hover:text-fg";
+    ? (bonus ? "bg-cool/20 text-cool" : "bg-good/20 text-good")
+    : "bg-white/[0.07] text-muted hover:bg-white/[0.12] hover:text-fg";
 
   const rightMeta = (
     <div className="flex shrink-0 flex-col items-end gap-1 font-mono text-[10px] text-muted">
@@ -44,17 +39,21 @@ export function HabitItem({ hb, bonus, code, value, on, miniOn, missedYesterday,
       aria-pressed={miniOnly}
       aria-label={`Versión de 2 minutos: ${hb.mini.trim()}`}
       title={hb.mini.trim()}
-      className={`min-h-[44px] shrink-0 rounded-xl border px-2.5 text-xs font-semibold transition active:scale-95 ${miniBtnCls}`}
+      className={`min-h-[40px] shrink-0 rounded-xl px-2.5 text-xs font-semibold transition active:scale-95 ${miniBtnCls}`}
     >
       2 min
     </button>
   );
 
+  const rowCls = `flex w-full items-center gap-2.5 transition ${
+    showMissed ? "bg-warn/[0.07] py-2.5 pl-2.5 pr-1 shadow-[inset_3px_0_0_rgb(var(--c-warn))]" : "py-2.5 first:pt-1 last:pb-1"
+  }`;
+
   if (hb.kind === "count") {
     const target = hb.target != null ? Number(hb.target) : 1;
     const count = value === true ? target : (typeof value === "number" ? value : 0);
     return (
-      <div className={`flex w-full items-center gap-2.5 rounded-xl border p-3 transition ${cardCls}`}>
+      <div className={rowCls}>
         <button
           type="button"
           onClick={onToggle}
@@ -69,24 +68,24 @@ export function HabitItem({ hb, bonus, code, value, on, miniOn, missedYesterday,
           {showMissed && <div className="mt-0.5 text-xs font-medium text-warn">Ayer fallaste: hoy no lo dejes pasar</div>}
           {miniOnly && hasMini && <div className="mt-0.5 text-xs text-muted">2 min: {hb.mini.trim()}</div>}
           <div className="mt-1.5 flex items-center gap-2">
-            <div className="inline-flex items-center gap-1 rounded-lg border border-line bg-surface/80 p-0.5">
+            <div className="inline-flex items-center gap-1 rounded-xl bg-white/[0.06] p-0.5">
               <button
                 type="button"
                 onClick={() => onAdjust && onAdjust(-1)}
                 disabled={count <= 0}
                 aria-label={`Restar 1 a ${hb.label}`}
-                className="grid h-8 w-8 place-items-center rounded-md bg-surface2 text-muted hover:text-fg disabled:pointer-events-none disabled:opacity-25"
+                className="grid h-8 w-8 place-items-center rounded-lg bg-white/[0.07] text-muted hover:bg-white/[0.12] hover:text-fg disabled:pointer-events-none disabled:opacity-25"
               >
                 <Minus size={13} />
               </button>
-              <span className="px-1.5 font-mono text-xs font-semibold tabular-nums text-fg">
+              <span className="px-1.5 font-mono text-xs font-bold tabular-nums text-fg">
                 {count}/{target}{hb.unit ? ` ${hb.unit}` : ""}
               </span>
               <button
                 type="button"
                 onClick={() => onAdjust && onAdjust(1)}
                 aria-label={`Sumar 1 a ${hb.label}`}
-                className="grid h-8 w-8 place-items-center rounded-md bg-surface2 text-muted hover:text-fg active:scale-95"
+                className="grid h-8 w-8 place-items-center rounded-lg bg-white/[0.07] text-muted hover:bg-white/[0.12] hover:text-fg active:scale-95"
               >
                 <Plus size={13} />
               </button>
@@ -100,7 +99,7 @@ export function HabitItem({ hb, bonus, code, value, on, miniOn, missedYesterday,
   }
 
   return (
-    <div className={`flex w-full items-center gap-2.5 rounded-xl border p-3 transition ${cardCls}`}>
+    <div className={rowCls}>
       <button
         type="button"
         onClick={onToggle}
@@ -209,28 +208,28 @@ export function HabitsMini({ habits, setHabits, habitDefs }) {
     <div className="space-y-4">
       <div>
         <div className="mb-2 flex items-center justify-between gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-good">Hábitos Obligatorios</span>
-          <span className="font-mono text-xs tabular-nums text-muted">{r}/{reqDefs.length} · {pct}%</span>
+          <span className="text-[13px] font-medium text-good">Hábitos obligatorios</span>
+          <span className="font-mono text-xs font-bold tabular-nums text-muted">{r}/{reqDefs.length} · {pct}%</span>
         </div>
-        <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-surface2">
+        <div className="mb-2.5 h-1.5 overflow-hidden rounded-full bg-white/[0.07]">
           <div className="h-full rounded-full bg-good transition-all duration-500" style={{ width: `${pct}%` }} />
         </div>
-        <div className="space-y-2">
+        <div className="divide-y divide-line">
           {reqDefs.map((hb, i) => renderItem(hb, false, `O${i + 1}`))}
         </div>
       </div>
       {optDefs.length > 0 && (
-        <div className="rounded-xl border border-dashed border-line p-2.5">
-          <div className="mb-2 flex items-center justify-between gap-2 px-0.5">
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cool">
-              <Star size={12} />Hábitos Facultativos · bonus
+        <div className="border-t border-line pt-4">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-cool">
+              <Star size={13} />Hábitos facultativos · bonus
             </span>
-            <span className="font-mono text-xs tabular-nums text-muted">+{o}/{optDefs.length}</span>
+            <span className="font-mono text-xs font-bold tabular-nums text-muted">+{o}/{optDefs.length}</span>
           </div>
-          <div className="space-y-2">
+          <div className="divide-y divide-line">
             {optDefs.map((hb, i) => renderItem(hb, true, `F${i + 1}`))}
           </div>
-          <p className="mt-2 px-0.5 text-[11px] text-muted">No cuentan para el 100 % del día.</p>
+          <p className="mt-2 text-xs text-muted">No cuentan para el 100 % del día.</p>
         </div>
       )}
     </div>
