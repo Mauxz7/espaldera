@@ -4,11 +4,11 @@ import { Dumbbell, Activity, Bike, X, Zap, Trophy, Footprints, ClipboardPaste, S
 import { pad, dkey, fromKey, addDays, mondayOf, DAYS, DAYS_LONG, fmtShort, fmtInt, fmtSleep, hhmm } from "../lib/dates.js";
 import { GH_SEED, SAMPLE_EMAIL, parseHealth, deriveWeek, fmtRange, hideHealthWeek, findWorkoutStrain } from "../lib/health.js";
 import { computeStreak } from "../lib/planner.js";
-import { usePersisted } from "../lib/storage.js";
 import { routineById } from "../data/program.js";
 import { WORKOUT_KINDS, KIND_LABELS, validWorkouts, lastWeeks } from "../lib/workouts.js";
 import { Chip } from "../components/ui.jsx";
 import { HealthRings } from "../components/HealthRings.jsx";
+import { HealthMonitor } from "../components/HealthMonitor.jsx";
 import { HealthSheets } from "../components/HealthSheets.jsx";
 
 const KIND_ICON = {
@@ -299,8 +299,7 @@ export function WorkoutsSection({ workouts, log, bevelHistory }) {
   );
 }
 
-export function DashboardView({ health, setHealth, log, bevelHistory, vitals }) {
-  const [workouts] = usePersisted("workouts", []);
+export function DashboardView({ health, setHealth, log, bevelHistory, vitals = {}, sleep = {}, workouts = [], setLog = {} }) {
   const [subTab, setSubTab] = useState("daily"); // "daily" | "weekly"
   const [activeSheet, setActiveSheet] = useState(null); // null | "recovery" | "sleep" | "strain"
   const [showImport, setShowImport] = useState(false);
@@ -434,6 +433,13 @@ export function DashboardView({ health, setHealth, log, bevelHistory, vitals }) 
               onToday={goTodayDate}
               onOpenSheet={setActiveSheet}
               vitals={vitals}
+            />
+            <HealthMonitor
+              vitals={vitals}
+              sleep={sleep}
+              bevelHistory={bevelHistory}
+              selectedDate={selectedDate}
+              todayKey={todayKey}
             />
             <WorkoutsSection workouts={workouts} log={log} bevelHistory={bevelHistory} />
             {activeSheet && (

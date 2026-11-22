@@ -27,8 +27,8 @@ export function recoveryTone(score) {
   return "warn";
 }
 
-export function recoverySubtitle(rec) {
-  if (!rec || rec.mode === "missing" || rec.score == null) return "Sin datos";
+export function recoverySubtitle(rec, isToday = false) {
+  if (!rec || rec.mode === "missing" || rec.score == null) return isToday ? "Esperando a Fitbit" : "Sin datos";
   if (rec.mode === "estimated") return "Estimada";
   if (rec.calibration === "ready") return "Base 60d";
   if (rec.calibration === "provisional") return "Provisional";
@@ -62,9 +62,10 @@ export function HealthRings({
   const strain = day?.strain || null;
   const bank = day?.energyBank || null;
 
+  const isToday = selectedDate === todayKey;
   const recScore = recovery && typeof recovery.score === "number" ? recovery.score : null;
   const recColor = recoveryTone(recScore);
-  const recSub = recoverySubtitle(recovery);
+  const recSub = recoverySubtitle(recovery, isToday);
 
   const sleepScore = sleep && typeof sleep.score === "number" ? sleep.score : null;
   const sleepSub = sleep && sleep.min > 0
@@ -76,7 +77,6 @@ export function HealthRings({
   const strainSub = `Meta ${strainTarget.min}–${strainTarget.max}%`;
 
   const hasBiometrics = hasAnyBiometricVitals(vitals);
-  const isToday = selectedDate === todayKey;
 
   const bankNow = bank && typeof bank.now === "number" ? bank.now : null;
   const bankStart = bank && typeof bank.start === "number" ? bank.start : null;
