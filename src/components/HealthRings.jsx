@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, AlertTriangle, BatteryCharging, Info } from "lucide-react";
 import { dkey, fromKey, addDays, DAYS, fmtShort } from "../lib/dates.js";
-import { Ring } from "./ui.jsx";
+import { Ring, Card, SectionTitle } from "./ui.jsx";
 
 function fmtHM(min) {
   if (typeof min !== "number" || !Number.isFinite(min) || min <= 0) return "—";
@@ -96,28 +96,28 @@ export function HealthRings({
         : "text-warn";
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Selector compacto de fecha (últimos 30 días) */}
-      <div className="flex items-center justify-between gap-2 rounded-2xl border border-line bg-surface px-2.5 py-2">
+      <div className="card flex items-center justify-between gap-2 px-2.5 py-2">
         <button
           type="button"
           onClick={onPrev}
           disabled={!canPrev}
           aria-label="Día anterior"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-line bg-surface2 text-fg transition hover:border-accent hover:text-accent disabled:opacity-30"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/[0.07] text-fg transition hover:bg-white/[0.12] hover:text-accent disabled:opacity-30"
         >
           <ChevronLeft size={18} />
         </button>
 
         <div className="flex min-w-0 items-center gap-2 text-center">
-          <span className="truncate font-mono text-xs font-semibold text-fg sm:text-sm">
+          <span className="truncate font-mono text-xs font-bold text-fg sm:text-sm">
             {formatDayLabel(selectedDate, todayKey)}
           </span>
           {!isToday && (
             <button
               type="button"
               onClick={onToday}
-              className="shrink-0 rounded-full border border-accent/40 bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent hover:bg-accent/25"
+              className="shrink-0 rounded-full bg-accent/15 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/25"
             >
               Hoy
             </button>
@@ -129,20 +129,20 @@ export function HealthRings({
           onClick={onNext}
           disabled={!canNext}
           aria-label="Día siguiente"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-line bg-surface2 text-fg transition hover:border-accent hover:text-accent disabled:opacity-30"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/[0.07] text-fg transition hover:bg-white/[0.12] hover:text-accent disabled:opacity-30"
         >
           <ChevronRight size={18} />
         </button>
       </div>
 
       {/* Hero de 3 anillos interactivos */}
-      <section className="rounded-2xl border border-line bg-surface p-3 sm:p-4">
-        <div className="grid grid-cols-3 gap-2">
+      <Card glow="good" className="p-3 sm:p-4">
+        <div className="grid grid-cols-3 gap-1 pt-1">
           <button
             type="button"
             onClick={() => onOpenSheet("recovery")}
             aria-label={`Recuperación: ${recScore != null ? `${recScore}%` : "sin datos"}. ${recSub}. Ver detalle`}
-            className="flex min-w-0 flex-col items-center rounded-xl border border-transparent bg-surface2/40 px-1 py-2.5 transition hover:border-line hover:bg-surface2 active:scale-[0.98]"
+            className="flex min-w-0 flex-col items-center rounded-2xl px-1 py-2 transition hover:bg-white/[0.05] active:scale-[0.98]"
           >
             <Ring
               value={recScore}
@@ -152,7 +152,7 @@ export function HealthRings({
               label="Recuperación"
               sub={recSub}
               color={recColor}
-              size="lg"
+              size="xl"
             />
           </button>
 
@@ -160,7 +160,7 @@ export function HealthRings({
             type="button"
             onClick={() => onOpenSheet("sleep")}
             aria-label={`Sueño: ${sleepScore != null ? `${sleepScore}%` : "sin datos"}. ${sleepSub}. Ver detalle`}
-            className="flex min-w-0 flex-col items-center rounded-xl border border-transparent bg-surface2/40 px-1 py-2.5 transition hover:border-line hover:bg-surface2 active:scale-[0.98]"
+            className="flex min-w-0 flex-col items-center rounded-2xl px-1 py-2 transition hover:bg-white/[0.05] active:scale-[0.98]"
           >
             <Ring
               value={sleepScore}
@@ -169,8 +169,8 @@ export function HealthRings({
               srText=""
               label="Sueño"
               sub={sleepSub}
-              color="cool"
-              size="lg"
+              color={sleepScore == null ? "muted" : "sleep"}
+              size="xl"
             />
           </button>
 
@@ -178,7 +178,7 @@ export function HealthRings({
             type="button"
             onClick={() => onOpenSheet("strain")}
             aria-label={`Strain: ${strainScore}%. ${strainSub}. Ver detalle`}
-            className="flex min-w-0 flex-col items-center rounded-xl border border-transparent bg-surface2/40 px-1 py-2.5 transition hover:border-line hover:bg-surface2 active:scale-[0.98]"
+            className="flex min-w-0 flex-col items-center rounded-2xl px-1 py-2 transition hover:bg-white/[0.05] active:scale-[0.98]"
           >
             <Ring
               value={strainScore}
@@ -187,20 +187,20 @@ export function HealthRings({
               srText=""
               label="Strain"
               sub={strainSub}
-              color="accent"
+              color="strain"
               targetRange={{ min: strainTarget.min, max: strainTarget.max }}
-              size="lg"
+              size="xl"
             />
           </button>
         </div>
-        <p className="mt-2 text-center text-[11px] text-muted">
+        <p className="mt-2 text-center text-xs text-muted">
           Toca un anillo para abrir el desglose y la tendencia de 14 días.
         </p>
-      </section>
+      </Card>
 
       {/* Banner de alerta biométrica (biometrics_off) */}
       {recovery?.alert === "biometrics_off" && (
-        <div role="alert" className="rounded-2xl border border-warn/45 bg-warn/10 p-3.5 text-sm">
+        <div role="alert" className="rounded-[22px] border border-warn/30 bg-warn/10 p-4 text-sm">
           <div className="flex items-start gap-2.5">
             <AlertTriangle size={18} className="mt-0.5 shrink-0 text-warn" />
             <div className="min-w-0 flex-1">
@@ -223,53 +223,56 @@ export function HealthRings({
       )}
 
       {/* Tarjeta compacta de Energy Bank */}
-      <section className="rounded-2xl border border-line bg-surface p-3.5 sm:p-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <BatteryCharging size={16} className={bankTextColor} />
-            <h2 className="font-display text-base font-semibold uppercase tracking-wide">Energy Bank</h2>
-          </div>
-          {bankStart != null && bankNow != null ? (
-            <div className="flex items-baseline gap-1.5 font-mono text-xs tabular-nums">
-              <span className="text-muted">Inicio {bankStart}%</span>
-              <span className="text-muted">→</span>
-              <span className={`font-semibold ${bankTextColor}`}>Ahora {bankNow}%</span>
+      <div>
+        <SectionTitle aside={bankStart != null && bankNow != null ? `Inicio ${bankStart}%` : null}>Energy Bank</SectionTitle>
+        <Card>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <BatteryCharging size={18} className={bankTextColor} />
+              <span className="text-sm font-semibold text-fg">Reserva del día</span>
             </div>
-          ) : (
-            <span className="text-xs text-muted">Sin datos de recuperación</span>
-          )}
-        </div>
-        <div
-          className="relative mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-surface2"
-          role="progressbar"
-          aria-label="Energy Bank actual"
-          aria-valuenow={bankNow ?? 0}
-          aria-valuemin={0}
-          aria-valuemax={100}
-        >
-          {bankStart != null && (
-            <div
-              className="absolute inset-y-0 left-0 rounded-full bg-fg/15"
-              style={{ width: `${Math.min(100, Math.max(0, bankStart))}%` }}
-            />
-          )}
-          {bankNow != null && (
-            <div
-              className={`relative h-full rounded-full transition-all duration-500 ${bankBarColor}`}
-              style={{ width: `${Math.min(100, Math.max(0, bankNow))}%` }}
-            />
-          )}
-        </div>
-        <p className="mt-1.5 text-[11px] text-muted">
-          {bankStart != null && bankNow != null
-            ? "Arranca con tu Recuperación matutina y baja conforme acumulas Strain durante el día."
-            : "Registra tu sueño o sincroniza Fitbit para calcular tu reserva diaria de energía."}
-        </p>
-      </section>
+            {bankStart != null && bankNow != null ? (
+              <div className="flex items-baseline gap-1.5 font-mono text-xs tabular-nums">
+                <span className="text-muted">Inicio {bankStart}%</span>
+                <span className="text-muted">→</span>
+                <span className={`font-bold ${bankTextColor}`}>Ahora {bankNow}%</span>
+              </div>
+            ) : (
+              <span className="text-xs text-muted">Sin datos de recuperación</span>
+            )}
+          </div>
+          <div
+            className="relative mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-white/[0.07]"
+            role="progressbar"
+            aria-label="Energy Bank actual"
+            aria-valuenow={bankNow ?? 0}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            {bankStart != null && (
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-fg/15"
+                style={{ width: `${Math.min(100, Math.max(0, bankStart))}%` }}
+              />
+            )}
+            {bankNow != null && (
+              <div
+                className={`relative h-full rounded-full transition-all duration-500 ${bankBarColor}`}
+                style={{ width: `${Math.min(100, Math.max(0, bankNow))}%` }}
+              />
+            )}
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            {bankStart != null && bankNow != null
+              ? "Arranca con tu Recuperación matutina y baja conforme acumulas Strain durante el día."
+              : "Registra tu sueño o sincroniza Fitbit para calcular tu reserva diaria de energía."}
+          </p>
+        </Card>
+      </div>
 
       {/* Aviso discreto si aún no hay vitals sincronizados */}
       {!hasBiometrics && (
-        <div className="flex items-start gap-2.5 rounded-2xl border border-line bg-surface2/60 px-3.5 py-2.5 text-xs text-muted">
+        <div className="flex items-start gap-2.5 rounded-2xl bg-white/[0.05] px-4 py-3 text-xs text-muted">
           <Info size={15} className="mt-0.5 shrink-0 text-cool" />
           <p className="min-w-0 leading-relaxed">
             La Recuperación está en modo <strong className="font-semibold text-fg">Estimada</strong> (sueño y carga reciente). Cuando actualices los scripts en <span className="font-mono text-fg/90">espaldera-data</span> y ejecutes <span className="font-mono text-fg/90">--solo-fitbit</span>, pasará automáticamente a biométrica real (HRV, RHR, SpO₂, FR y temperatura).

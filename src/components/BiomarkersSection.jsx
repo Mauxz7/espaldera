@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Scale, Activity, HeartPulse, ChevronRight } from "lucide-react";
 import { trendCard, seriesOf } from "../lib/metrics.js";
 import { fmtShort } from "../lib/dates.js";
-import { Chip } from "./ui.jsx";
+import { Card, SectionTitle, StatusDot } from "./ui.jsx";
 import { MiniSparkline, trendPill } from "./TrendSparkline.jsx";
 import { TrendDetailSheet } from "./TrendDetailSheet.jsx";
 
@@ -102,115 +102,111 @@ export function BiomarkersSection({ vitals, health, selectedDate, todayKey }) {
   ];
 
   return (
-    <section className="min-w-0 rounded-2xl border border-line bg-surface p-3.5 sm:p-4">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-display text-lg font-semibold uppercase tracking-wide text-fg">
-          Biomarcadores
-        </h2>
-        <span className="text-[11px] text-muted">Ventana de 90 días</span>
-      </div>
-
-      <ul className="divide-y divide-line">
-        {/* Peso */}
-        <li className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-surface2 text-accent">
-              <Scale size={16} aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <div className="text-sm font-medium text-fg">Peso</div>
-              <div className="text-[11px] text-muted">
-                {latestWeight
-                  ? (latestWeight.date
-                    ? `${latestWeight.source === "health" ? "Sem. " : ""}${fmtShort(latestWeight.date)}`
-                    : "Último registro")
-                  : "Sin datos"}
+    <div>
+      <SectionTitle aside="Ventana de 90 días">Biomarcadores</SectionTitle>
+      <Card className="min-w-0">
+        <ul className="divide-y divide-line">
+          {/* Peso */}
+          <li className="flex flex-wrap items-center justify-between gap-2 py-2.5 first:pt-0">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/[0.07] text-accent">
+                <Scale size={16} aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-fg">Peso</div>
+                <div className="text-[11px] text-muted">
+                  {latestWeight
+                    ? (latestWeight.date
+                      ? `${latestWeight.source === "health" ? "Sem. " : ""}${fmtShort(latestWeight.date)}`
+                      : "Último registro")
+                    : "Sin datos"}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="font-mono text-sm font-semibold text-fg tabular-nums">
-              {latestWeight ? `${latestWeight.value.toFixed(1)} kg` : "—"}
-            </span>
-            <Chip tone={latestWeight ? "good" : "plain"}>
-              {latestWeight ? "Registrado" : "Sin datos"}
-            </Chip>
-          </div>
-        </li>
+            <div className="flex shrink-0 items-center gap-2.5">
+              <span className="font-mono text-sm font-bold text-fg tabular-nums">
+                {latestWeight ? `${latestWeight.value.toFixed(1)} kg` : "—"}
+              </span>
+              <StatusDot tone={latestWeight ? "good" : "muted"}>
+                {latestWeight ? "Registrado" : "Sin datos"}
+              </StatusDot>
+            </div>
+          </li>
 
-        {/* Líneas base 90 días: HRV y FC en reposo */}
-        {baselineRows.map(({ key, title, metric, card, iconBg }) => {
-          const Icon = metric.icon;
-          const pill = trendPill(card.status, metric.polarity);
-          const hasVal = typeof card.value === "number" && Number.isFinite(card.value);
-          const rangeText = card.range
-            ? `Rango 90 d: ${metric.fmtRange(card.range)}`
-            : card.status === "calibrating"
-              ? "Calibrando (<7 d)"
-              : "Sin línea base 90 d";
+          {/* Líneas base 90 días: HRV y FC en reposo */}
+          {baselineRows.map(({ key, title, metric, card, iconBg }) => {
+            const Icon = metric.icon;
+            const pill = trendPill(card.status, metric.polarity);
+            const hasVal = typeof card.value === "number" && Number.isFinite(card.value);
+            const rangeText = card.range
+              ? `Rango 90 d: ${metric.fmtRange(card.range)}`
+              : card.status === "calibrating"
+                ? "Calibrando (<7 d)"
+                : "Sin línea base 90 d";
 
-          return (
-            <li key={key} className="py-2.5 first:pt-0 last:pb-0">
-              <button
-                type="button"
-                onClick={() => setOpenDetail({ metric, card })}
-                className="flex w-full min-w-0 flex-col gap-2 rounded-xl px-1 py-1 text-left transition hover:bg-surface2/50 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
-              >
-                <div className="flex min-w-0 items-center justify-between gap-2 sm:flex-1">
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-surface2 ${iconBg}`}>
-                      <Icon size={16} aria-hidden="true" />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-fg">{title}</div>
-                      <div className="truncate font-mono text-[11px] text-muted tabular-nums">
-                        {rangeText}
+            return (
+              <li key={key} className="py-2.5 last:pb-0">
+                <button
+                  type="button"
+                  onClick={() => setOpenDetail({ metric, card })}
+                  className="flex w-full min-w-0 flex-col gap-2 rounded-xl px-1 py-1 text-left transition hover:bg-white/[0.05] sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+                >
+                  <div className="flex min-w-0 items-center justify-between gap-2 sm:flex-1">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/[0.07] ${iconBg}`}>
+                        <Icon size={16} aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-fg">{title}</div>
+                        <div className="truncate font-mono text-[11px] text-muted tabular-nums">
+                          {rangeText}
+                        </div>
                       </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-1.5 sm:hidden">
+                      <span className="font-mono text-sm font-bold text-fg tabular-nums">
+                        {hasVal ? `${metric.fmtValue(card.value)} ${metric.unit}` : "—"}
+                      </span>
+                      <ChevronRight size={15} className="text-muted" aria-hidden="true" />
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-1.5 sm:hidden">
-                    <span className="font-mono text-sm font-semibold text-fg tabular-nums">
-                      {hasVal ? `${metric.fmtValue(card.value)} ${metric.unit}` : "—"}
-                    </span>
-                    <ChevronRight size={15} className="text-muted" aria-hidden="true" />
+                  <div className="flex items-center justify-between gap-3 sm:shrink-0">
+                    <div className="min-w-0 flex-1 sm:w-32 sm:flex-none">
+                      <MiniSparkline
+                        spark={card.spark}
+                        range={card.range}
+                        stroke={metric.stroke}
+                        height={30}
+                      />
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2.5">
+                      <span className="hidden font-mono text-sm font-bold text-fg tabular-nums sm:inline">
+                        {hasVal ? `${metric.fmtValue(card.value)} ${metric.unit}` : "—"}
+                      </span>
+                      <StatusDot tone={pill.tone === "plain" ? "muted" : pill.tone}>{pill.text}</StatusDot>
+                      <ChevronRight size={15} className="hidden text-muted sm:inline" aria-hidden="true" />
+                    </div>
                   </div>
-                </div>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
 
-                <div className="flex items-center justify-between gap-3 sm:shrink-0">
-                  <div className="min-w-0 flex-1 sm:w-32 sm:flex-none">
-                    <MiniSparkline
-                      spark={card.spark}
-                      range={card.range}
-                      stroke={metric.stroke}
-                      height={30}
-                    />
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span className="hidden font-mono text-sm font-semibold text-fg tabular-nums sm:inline">
-                      {hasVal ? `${metric.fmtValue(card.value)} ${metric.unit}` : "—"}
-                    </span>
-                    <Chip tone={pill.tone}>{pill.text}</Chip>
-                    <ChevronRight size={15} className="hidden text-muted sm:inline" aria-hidden="true" />
-                  </div>
-                </div>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-
-      {openDetail && (
-        <TrendDetailSheet
-          metric={openDetail.metric}
-          card={openDetail.card}
-          selectedDate={selectedDate}
-          todayKey={todayKey}
-          windowDays={90}
-          onClose={() => setOpenDetail(null)}
-        />
-      )}
-    </section>
+        {openDetail && (
+          <TrendDetailSheet
+            metric={openDetail.metric}
+            card={openDetail.card}
+            selectedDate={selectedDate}
+            todayKey={todayKey}
+            windowDays={90}
+            onClose={() => setOpenDetail(null)}
+          />
+        )}
+      </Card>
+    </div>
   );
 }

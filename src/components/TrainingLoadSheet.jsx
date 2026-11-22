@@ -2,7 +2,7 @@ import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Cartesian
 import { Flame, Dumbbell } from "lucide-react";
 import { LOAD_STATUS } from "../lib/metrics.js";
 import { fmtShort } from "../lib/dates.js";
-import { Chip } from "./ui.jsx";
+import { StatusDot } from "./ui.jsx";
 import { SheetDialog } from "./SheetDialog.jsx";
 import { formatDayLabel } from "./HealthRings.jsx";
 
@@ -63,21 +63,21 @@ export function TrainingLoadSheet({ kind, load, selectedDate, todayKey, onClose 
     <SheetDialog
       eyebrow="Fitness · últimos 30 días"
       icon={Icon}
-      accent={isCardio ? "text-accent" : "text-good"}
+      accent={isCardio ? "text-strain" : "text-accent"}
       title={title}
       subtitle={formatDayLabel(selectedDate, todayKey)}
       onClose={onClose}
     >
       <div className="space-y-4">
         {/* Resumen de carga actual */}
-        <section className="rounded-2xl border border-line bg-surface2/60 p-3.5">
+        <section className="rounded-2xl bg-white/[0.06] p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+              <div className="text-[13px] font-medium text-muted">
                 Carga aguda (7 d)
               </div>
               <div className="mt-1 flex items-baseline gap-2">
-                <span className={`font-display text-4xl font-semibold leading-none tabular-nums ${meta.textCls}`}>
+                <span className={`font-mono text-4xl font-bold leading-none tabular-nums ${meta.textCls}`}>
                   {load.value}
                 </span>
                 {load.ratio != null && (
@@ -87,15 +87,15 @@ export function TrainingLoadSheet({ kind, load, selectedDate, todayKey, onClose 
                 )}
               </div>
             </div>
-            <Chip tone={meta.tone}>{meta.label}</Chip>
+            <StatusDot tone={meta.tone === "plain" ? "muted" : meta.tone}>{meta.label}</StatusDot>
           </div>
           <p className="mt-2 font-mono text-[11px] text-muted">{optimalText}</p>
         </section>
 
         {/* Gráfico de 30 días: línea + banda óptima */}
-        <section className="rounded-2xl border border-line bg-surface2/30 p-3.5">
+        <section className="rounded-2xl bg-white/[0.05] p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-display text-sm font-semibold uppercase tracking-wide text-fg">
+            <h3 className="text-[15px] font-bold tracking-tight text-fg">
               Evolución 30 días
             </h3>
             <div className="flex items-center gap-3 text-[11px] text-muted">
@@ -164,15 +164,15 @@ export function TrainingLoadSheet({ kind, load, selectedDate, todayKey, onClose 
         </section>
 
         {/* Desglose de días por estado */}
-        <section className="rounded-2xl border border-line bg-surface2/30 p-3.5">
+        <section className="rounded-2xl bg-white/[0.05] p-4">
           <div className="mb-2.5 flex items-baseline justify-between gap-2">
-            <h3 className="font-display text-sm font-semibold uppercase tracking-wide text-fg">
+            <h3 className="text-[15px] font-bold tracking-tight text-fg">
               Días por estado
             </h3>
             <span className="font-mono text-[11px] text-muted">{totalDays} días</span>
           </div>
 
-          <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface" aria-hidden="true">
+          <div className="flex h-3 w-full overflow-hidden rounded-full bg-white/[0.08]" aria-hidden="true">
             {LOAD_STATUS.map((key) => {
               const days = breakdown[key] || 0;
               if (days <= 0) return null;
@@ -199,7 +199,7 @@ export function TrainingLoadSheet({ kind, load, selectedDate, todayKey, onClose 
                     <span className={`h-2 w-2 shrink-0 rounded-full ${itemMeta.dotCls}`} aria-hidden="true" />
                     <span className="truncate text-fg">{itemMeta.label}</span>
                   </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface" aria-hidden="true">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]" aria-hidden="true">
                     <div
                       className={`h-full rounded-full ${itemMeta.barCls}`}
                       style={{ width: `${(days / totalDays) * 100}%` }}
