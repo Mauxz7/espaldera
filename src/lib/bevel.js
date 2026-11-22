@@ -454,8 +454,9 @@ export function computeRecovery({
   }
 
   // Modo degradado (sin HRV ni RHR): SleepScore (65%) + fatiga residual ATL3/CTL21 (35%).
-  const hasLoadHistory = (isNum(atl3) && atl3 > 0) || (isNum(ctl21) && ctl21 > 0);
-  if (sleepVal == null && !hasLoadHistory && penalty === 0) {
+  // Sin sueño NO se estima: antes de que Fitbit mande la noche, la carga sola daba
+  // cifras engañosas (p. ej. 23 %) y el planificador bajaba el día a Baja Energía.
+  if (sleepVal == null) {
     return {
       score: null,
       baseScore: null,
@@ -464,9 +465,9 @@ export function computeRecovery({
       mode: "missing",
       calibration: "calibrating",
       zScore: null,
-      penalty: 0,
-      alert: null,
-      alertReasons: [],
+      penalty,
+      alert,
+      alertReasons,
       biomarkers,
       atl3: 0,
       ctl21: 0,
