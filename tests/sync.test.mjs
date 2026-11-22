@@ -146,3 +146,20 @@ test("SYNC_KEYS incluye customExercises y freeSessions y se sincronizan con retr
   assert.deepEqual(await b.read("customExercises"), customSample);
   assert.deepEqual(await b.read("freeSessions"), freeSample);
 });
+
+test("SYNC_KEYS incluye soreness y se sincroniza con retrocompatibilidad", async () => {
+  const { SYNC_KEYS } = await import("../src/lib/storage.js");
+  assert.ok(SYNC_KEYS.includes("soreness"));
+
+  const oldDev = await device("r");
+  await oldDev.sync();
+  assert.equal(await oldDev.read("soreness"), undefined);
+
+  const a = await device("s");
+  const b = await device("t");
+  const sample = { "2026-11-22": { calves: true } };
+  await a.write("soreness", sample, 8000);
+  await a.sync();
+  await b.sync();
+  assert.deepEqual(await b.read("soreness"), sample);
+});

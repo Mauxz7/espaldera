@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { EQ, ROUTINES, routineById, variantsFor } from "../src/data/program.js";
 import { SUBS, EXERCISE_LIBRARY, PATTERNS, altFor } from "../src/data/subs.js";
+import { MUSCLE_GROUPS } from "../src/lib/metrics.js";
 import {
   resolveVariantId,
   getActiveRoutine,
@@ -21,12 +22,22 @@ test("EQ incluye correas, rueda abdominal, tabla inclinada y paralelas además d
 test("todos los ejercicios en ROUTINES, variantes, SUBS y EXERCISE_LIBRARY son válidos y sin IDs repetidos en una misma rutina", () => {
   const validEq = new Set(Object.keys(EQ));
   const validPatterns = new Set(Object.keys(PATTERNS));
+  const validMuscles = new Set(Object.keys(MUSCLE_GROUPS));
+  const checkMuscles = (m, ctx, required = false) => {
+    if (required) assert.ok(m && typeof m === "object" && Object.keys(m).length > 0, `${ctx}: falta muscles`);
+    if (!m) return;
+    for (const [g, w] of Object.entries(m)) {
+      assert.ok(validMuscles.has(g), `${ctx}: grupo muscular inválido ${g}`);
+      assert.ok(typeof w === "number" && Number.isFinite(w) && w > 0 && w <= 1, `${ctx}: peso inválido ${w} en ${g}`);
+    }
+  };
   const checkExercise = (ex, ctx) => {
     assert.ok(ex.id && typeof ex.id === "string", `${ctx}: falta id`);
     assert.ok(ex.name && typeof ex.name === "string", `${ctx}: falta name`);
     assert.ok(Array.isArray(ex.eq) && ex.eq.length > 0, `${ctx}: eq vacío en ${ex.id}`);
     for (const e of ex.eq) assert.ok(validEq.has(e), `${ctx}: equipo desconocido ${e} en ${ex.id}`);
     assert.ok(validPatterns.has(ex.pattern), `${ctx}: pattern inválido ${ex.pattern} en ${ex.id}`);
+    checkMuscles(ex.muscles, `${ctx}.${ex.id}`, true);
   };
 
   for (const r of ROUTINES) {
@@ -51,6 +62,7 @@ test("todos los ejercicios en ROUTINES, variantes, SUBS y EXERCISE_LIBRARY son v
     for (const sub of list) {
       assert.ok(sub.id && sub.name, `sub incompleto en ${exId}`);
       for (const e of sub.eq) assert.ok(validEq.has(e), `equipo desconocido ${e} en SUBS.${exId}.${sub.id}`);
+      checkMuscles(sub.muscles, `SUBS.${exId}.${sub.id}`, false);
     }
   }
 

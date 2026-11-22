@@ -51,6 +51,7 @@ export function TrainView({
   setCustomExercises: setCustomExercisesProp,
   freeSessions: freeSessionsProp,
   setFreeSessions: setFreeSessionsProp,
+  soreness: sorenessProp,
   startTimer,
   openWarmup,
   wp,
@@ -67,18 +68,20 @@ export function TrainView({
   const [localFreeSessions, setLocalFreeSessions] = usePersisted("freeSessions", {});
   const freeSessions = freeSessionsProp !== undefined ? freeSessionsProp : localFreeSessions;
   const setFreeSessions = setFreeSessionsProp || setLocalFreeSessions;
+  const [localSoreness] = usePersisted("soreness", {});
+  const soreness = sorenessProp !== undefined ? sorenessProp : localSoreness;
   const [workouts] = usePersisted("workouts", []);
   const hasFreeToday = hasFreeWorkout(seriesLog, today);
   const doneToday = log[today]?.r || (hasFreeToday ? "free" : null);
   // Recomendación del día: frescura muscular + recuperación + lo ya hecho esta semana.
   const plannedRid = wp.arr[wp.todayIdx] || null;
   const rec = useMemo(() => {
-    const { groups } = muscleGroups(seriesLog, today, { log, workouts, customExercises });
+    const { groups } = muscleGroups(seriesLog, today, { log, workouts, customExercises, soreness });
     const r = bevelHistory?.byDate?.[today]?.recovery;
     const recovery = r && r.mode !== "missing" && typeof r.score === "number" ? r.score : null;
     const weekDone = (wp.keys || []).filter((k) => k < today).map((k) => log[k]?.r).filter(Boolean);
     return recommendTraining({ groups, recovery, plannedRid, doneToday, weekDone, routineVariants, setLog: seriesLog, today });
-  }, [seriesLog, log, workouts, customExercises, bevelHistory, today, plannedRid, doneToday, wp.keys, routineVariants]);
+  }, [seriesLog, log, workouts, customExercises, soreness, bevelHistory, today, plannedRid, doneToday, wp.keys, routineVariants]);
   const [rid, setRid] = useState(() => initialRid || log[dkey()]?.r || (hasFreeWorkout(seriesLog, dkey()) ? "free" : null) || (rec && rec.rid) || plannedRid || wp.nextRid || "d1");
   const [swapFor, setSwapFor] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
