@@ -24,7 +24,6 @@ const {
   shouldFireReminder,
   buildNotificationPayload,
   resolveCompletedValue,
-  ReminderBanner,
 } = reminderMod;
 
 test("parseRemindAt valida horas HH:MM y rechaza valores inválidos", () => {
@@ -188,45 +187,6 @@ test("buildNotificationPayload y resolveCompletedValue manejan uno o varios háb
   assert.equal(resolveCompletedValue(water), 2);
 });
 
-test("ReminderBanner muestra un solo aviso con la lista de pendientes y un botón de marcar por hábito", () => {
-  const dueHabits = [
-    { id: "o_creatine", label: "Tomar creatina todos los días.", kind: "check", target: 1, remindAt: "12:00" },
-    { id: "o_water", label: "Tomar 2 botellas de agua.", kind: "count", target: 2, unit: "botellas", remindAt: "14:00" },
-  ];
-
-  // Oculto o sin pendientes no renderiza nada
-  assert.equal(
-    renderToStaticMarkup(React.createElement(ReminderBanner, { rem: { due: false, dueHabits: [] } })),
-    ""
-  );
-  assert.equal(
-    renderToStaticMarkup(React.createElement(ReminderBanner, { rem: { due: true, hidden: true, dueHabits } })),
-    ""
-  );
-
-  // Con pendientes muestra un único role="alert" listando ambos hábitos y sus botones de marcar
-  const html = renderToStaticMarkup(
-    React.createElement(ReminderBanner, {
-      rem: {
-        due: true,
-        hidden: false,
-        ringing: true,
-        dueHabits,
-        dayHabits: { o_water: 1 },
-        setHidden: () => {},
-      },
-      onTake: () => {},
-    })
-  );
-
-  assert.match(html, /2 hábitos pendientes/);
-  assert.match(html, /Tomar creatina todos los días\./);
-  assert.match(html, /Tomar 2 botellas de agua\./);
-  assert.match(html, /1\/2 botellas/);
-  assert.match(html, /aria-label="Marcar Tomar creatina todos los días\."/);
-  assert.match(html, /aria-label="Marcar Tomar 2 botellas de agua\."/);
-});
-
 test("recordatorios de app incluyen el ancla after y respetan la versión de 2 minutos", () => {
   const hb = {
     id: "o_read",
@@ -247,13 +207,4 @@ test("recordatorios de app incluyen el ancla after y respetan la versión de 2 m
   // Cuerpo del aviso incluye «Después de …: …»
   const payload = buildNotificationPayload([hb], at2030);
   assert.match(payload.body, /^Después de lavarme los dientes: /);
-
-  // Banner también muestra el ancla
-  const html = renderToStaticMarkup(
-    React.createElement(ReminderBanner, {
-      rem: { due: true, hidden: false, ringing: false, dueHabits: [hb], dayHabits: {}, setHidden: () => {} },
-      onTake: () => {},
-    })
-  );
-  assert.match(html, /Después de lavarme los dientes/);
 });

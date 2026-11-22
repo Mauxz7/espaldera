@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Dumbbell, Activity, Sunrise, Settings, LayoutDashboard } from "lucide-react";
 import { Sync, usePersisted } from "./lib/storage.js";
-import { dkey, addDays, pruneDays } from "./lib/dates.js";
-import { CREATINE_ID, DEFAULT_HABIT_DEFS } from "./data/habits.js";
+import { dkey, addDays } from "./lib/dates.js";
+import { DEFAULT_HABIT_DEFS } from "./data/habits.js";
 import { useWeekPlan } from "./lib/planner.js";
 import { DEFAULT_HEALTH_PREFS, computeBevelHistory } from "./lib/bevel.js";
 import { useCalendarSync } from "./lib/calendar.js";
@@ -15,7 +15,7 @@ import { HomeView } from "./views/HomeView.jsx";
 import { ReviewView } from "./views/ReviewView.jsx";
 import { DashboardView } from "./views/DashboardView.jsx";
 import { HabitsView } from "./views/HabitsView.jsx";
-import { useHabitReminders, ReminderBanner, ReminderCard, resolveCompletedValue } from "./lib/reminder.jsx";
+import { useHabitReminders, ReminderCard } from "./lib/reminder.jsx";
 import { SettingsView } from "./views/SettingsView.jsx";
 
 export const TABS = [
@@ -115,12 +115,6 @@ export default function App() {
   }, []);
 
   const rem = useHabitReminders(habitDefs, habits[today] || {});
-  const completeHabit = useCallback((id = CREATINE_ID) => {
-    const defs = habitDefs || DEFAULT_HABIT_DEFS;
-    const def = defs.find((d) => d.id === id);
-    const val = resolveCompletedValue(def);
-    setHabits((all) => pruneDays({ ...all, [today]: { ...(all[today] || {}), [id]: val } }, 60));
-  }, [habitDefs, setHabits, today]);
 
   return (
     <div className="min-h-full md:flex">
@@ -170,7 +164,6 @@ export default function App() {
       </nav>
 
       <RestTimer timer={timer} setTimer={setTimer} />
-      <ReminderBanner rem={rem} onTake={completeHabit} />
       {warmup && <WarmupSheet onClose={() => setWarmup(false)} />}
     </div>
   );
