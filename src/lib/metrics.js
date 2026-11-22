@@ -469,7 +469,14 @@ function workEntries(setLog, { log = null, workouts = null, customExercises = nu
  *            counts: { recovered: number, fatigued: number, depleted: number } }}
  */
 export function muscleGroups(setLog, dateKey, { log = null, workouts = null, customExercises = null, soreness = null, now = null, sessionHour = 7, days = 7 } = {}) {
-  const ref = now instanceof Date ? now : new Date(fromKey(dateKey).getTime() + 23.99 * 3600e3);
+  // Hoy se mide «ahora»; un día pasado, al final de ese día.
+  const ref = now instanceof Date ? now : dateKey === dkey() ? new Date() : new Date(fromKey(dateKey).getTime() + 23.99 * 3600e3);
+  // Hora real de la sesión: cuando se marcó en el log (si cae ese mismo día); si no, `sessionHour`.
+  const sessionStart = (day) => {
+    const at = Number(log?.[day]?.at);
+    if (Number.isFinite(at) && at > 0 && dkey(new Date(at)) === day) return at;
+    return fromKey(day).getTime() + sessionHour * 3600e3;
+  };
   const entries = workEntries(setLog, { log, workouts, customExercises });
   const trainedDaysByGroup = {};
   for (const e of entries) {
@@ -486,7 +493,7 @@ export function muscleGroups(setLog, dateKey, { log = null, workouts = null, cus
   const sets = {};
   const reps = {};
   for (const e of entries) {
-    const hoursAgo = (ref - (fromKey(e.day).getTime() + sessionHour * 3600e3)) / 3600e3;
+    const hoursAgo = (ref - sessionStart(e.day)) / 3600e3;
     if (hoursAgo < 0) continue;
     const inWindow = hoursAgo <= days * 24;
     if (!dayEffLoad[e.day]) dayEffLoad[e.day] = {};
@@ -503,7 +510,7 @@ export function muscleGroups(setLog, dateKey, { log = null, workouts = null, cus
 
   const fatigue = {};
   for (const [day, groupMap] of Object.entries(dayEffLoad)) {
-    const hoursAgo = (ref - (fromKey(day).getTime() + sessionHour * 3600e3)) / 3600e3;
+    const hoursAgo = (ref - sessionStart(day)) / 3600e3;
     if (hoursAgo < 0) continue;
     for (const [g, rawEff] of Object.entries(groupMap)) {
       const profile = MUSCLE_PROFILE[g] || DEFAULT_PROFILE;

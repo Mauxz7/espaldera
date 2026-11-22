@@ -304,3 +304,13 @@ test("soreness manual: toggleSoreness fuerza <= 65 % por 24 h y marca manual", (
   s = toggleSoreness(s, { date: D, group: "calves" });
   assert.deepEqual(s, {});
 });
+
+test("muscleGroups usa la hora real de la sesión (log.at) en vez de sessionHour", () => {
+  const day = "2026-03-10";
+  const setLog = { [day]: { free: { lib_pullup_prona: [{ reps: 8 }, { reps: 8 }, { reps: 8 }, { reps: 8 }] } } };
+  const now = new Date(2026, 2, 11, 14, 0);
+  const at = new Date(2026, 2, 10, 13, 0).getTime();
+  const early = muscleGroups(setLog, "2026-03-11", { now }).groups.find((g) => g.group === "lats").pct;
+  const real = muscleGroups(setLog, "2026-03-11", { now, log: { [day]: { r: "free", at } } }).groups.find((g) => g.group === "lats").pct;
+  assert.ok(real < early, `sesión a la 1 p. m. debe dejar más fatiga (${real}) que asumir las 7 a. m. (${early})`);
+});
