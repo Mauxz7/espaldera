@@ -9,6 +9,7 @@ import { WORKOUT_KINDS, KIND_LABELS, validWorkouts, lastWeeks } from "../lib/wor
 import { Chip } from "../components/ui.jsx";
 import { HealthRings } from "../components/HealthRings.jsx";
 import { HealthMonitor } from "../components/HealthMonitor.jsx";
+import { FitnessSection } from "../components/FitnessSection.jsx";
 import { HealthSheets } from "../components/HealthSheets.jsx";
 
 const KIND_ICON = {
@@ -438,6 +439,13 @@ export function DashboardView({ health, setHealth, log, bevelHistory, vitals = {
               vitals={vitals}
               sleep={sleep}
               bevelHistory={bevelHistory}
+              selectedDate={selectedDate}
+              todayKey={todayKey}
+            />
+            <FitnessSection
+              bevelHistory={bevelHistory}
+              workouts={workouts}
+              setLog={setLog}
               selectedDate={selectedDate}
               todayKey={todayKey}
             />
