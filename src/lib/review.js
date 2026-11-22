@@ -153,6 +153,7 @@ export function buildWeekReview({
   habitDefs,
   identities,
   log,
+  setLog,
   fixed,
   fromFitbit,
   workouts,
@@ -177,13 +178,14 @@ export function buildWeekReview({
     habitDefs,
     identities,
     log,
+    setLog,
     fromFitbit: resolvedFromFitbit,
     dopamine,
     dopamineDefs,
     sleep,
   });
   const top = topIdentity(votes);
-  const progress = weekProgress({ keys, todayIdx: idx, fixed: resolvedFixed, habits, habitDefs, workouts });
+  const progress = weekProgress({ keys, todayIdx: idx, fixed: resolvedFixed, habits, habitDefs, workouts, setLog });
   const dopa = dopamineWeekStats({ keys, todayIdx: idx, dopamine, dopamineDefs });
   const sleepStats = sleepWeekStats(sleep, keys, idx);
   const weekWins = winsForWeek(wins, keys);

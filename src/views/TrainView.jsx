@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Check, Zap, BatteryLow, Trophy, Watch, Play, Flag } from "lucide-react";
+import { Check, Zap, BatteryLow, Trophy, Watch, Play, Flag, Dumbbell } from "lucide-react";
 import { dkey, pruneDays } from "../lib/dates.js";
 import { usePersisted } from "../lib/storage.js";
 import { getLastExerciseLog, resolveDefaultSet, recordSet, removeSet, updateExerciseLoad } from "../lib/setLog.js";
@@ -12,39 +12,90 @@ import { ProgressBar, Card, StatusDot, btnCls } from "../components/ui.jsx";
 import { SwapModal, ExerciseCard, withAlt } from "../components/ExerciseCard.jsx";
 import { WorkoutMode } from "../components/WorkoutMode.jsx";
 import { WorkoutSummary } from "../components/WorkoutSummary.jsx";
+import { FreeWorkoutView } from "../components/FreeWorkoutView.jsx";
+import { ExercisePickerSheet } from "../components/ExercisePickerSheet.jsx";
 import { touchSession, finishSession, buildWorkoutSummary, nextPendingExercise } from "../lib/workout.js";
 import { useFitbitShortcut, buildFitbitShortcutUrl } from "../components/FitbitShortcutCard.jsx";
 import { TrainRecommendation } from "../components/TrainRecommendation.jsx";
-import { muscleGroups, recommendTraining } from "../lib/metrics.js";
+import { muscleGroups, recommendTraining, hasFreeWorkout } from "../lib/metrics.js";
+import {
+  getFreeExIds,
+  addExercisesToFreeSession,
+  removeExerciseFromFreeSession,
+  moveExerciseInFreeSession,
+  setFreeExerciseSeries,
+  removeFreeExerciseFromSetLog,
+  createCustomExercise,
+  buildFreeWorkoutSummary,
+} from "../lib/freeWorkout.js";
 
-export function TrainView({ sets, setSets, seriesLog: seriesLogProp, setSeriesLog: setSeriesLogProp, log, setLog, block, swaps, setSwaps, loads, setLoads, lastLoads, setLastLoads, routineVariants, setRoutineVariants, skips, setSkips, startTimer, openWarmup, wp, initialRid, bevelHistory }) {
+export function TrainView({
+  sets,
+  setSets,
+  seriesLog: seriesLogProp,
+  setSeriesLog: setSeriesLogProp,
+  log,
+  setLog,
+  block,
+  swaps,
+  setSwaps,
+  loads,
+  setLoads,
+  lastLoads,
+  setLastLoads,
+  routineVariants,
+  setRoutineVariants,
+  skips,
+  setSkips,
+  customExercises: customExercisesProp,
+  setCustomExercises: setCustomExercisesProp,
+  freeSessions: freeSessionsProp,
+  setFreeSessions: setFreeSessionsProp,
+  startTimer,
+  openWarmup,
+  wp,
+  initialRid,
+  bevelHistory,
+}) {
   const today = dkey();
   const [localSeriesLog, setLocalSeriesLog] = usePersisted("setLog", {});
   const seriesLog = seriesLogProp !== undefined ? seriesLogProp : localSeriesLog;
+  const setSeriesLog = setSeriesLogProp || setLocalSeriesLog;
+  const [localCustomExercises, setLocalCustomExercises] = usePersisted("customExercises", []);
+  const customExercises = customExercisesProp !== undefined ? customExercisesProp : localCustomExercises;
+  const setCustomExercises = setCustomExercisesProp || setLocalCustomExercises;
+  const [localFreeSessions, setLocalFreeSessions] = usePersisted("freeSessions", {});
+  const freeSessions = freeSessionsProp !== undefined ? freeSessionsProp : localFreeSessions;
+  const setFreeSessions = setFreeSessionsProp || setLocalFreeSessions;
   const [workouts] = usePersisted("workouts", []);
+  const hasFreeToday = hasFreeWorkout(seriesLog, today);
+  const doneToday = log[today]?.r || (hasFreeToday ? "free" : null);
   // Recomendación del día: frescura muscular + recuperación + lo ya hecho esta semana.
   const plannedRid = wp.arr[wp.todayIdx] || null;
   const rec = useMemo(() => {
-    const { groups } = muscleGroups(seriesLog, today, { log, workouts });
+    const { groups } = muscleGroups(seriesLog, today, { log, workouts, customExercises });
     const r = bevelHistory?.byDate?.[today]?.recovery;
     const recovery = r && r.mode !== "missing" && typeof r.score === "number" ? r.score : null;
     const weekDone = (wp.keys || []).filter((k) => k < today).map((k) => log[k]?.r).filter(Boolean);
-    return recommendTraining({ groups, recovery, plannedRid, doneToday: log[today]?.r || null, weekDone, routineVariants });
-  }, [seriesLog, log, workouts, bevelHistory, today, plannedRid, wp.keys, routineVariants]);
-  const [rid, setRid] = useState(() => initialRid || log[dkey()]?.r || (rec && rec.rid) || plannedRid || wp.nextRid || "d1");
+    return recommendTraining({ groups, recovery, plannedRid, doneToday, weekDone, routineVariants, setLog: seriesLog, today });
+  }, [seriesLog, log, workouts, customExercises, bevelHistory, today, plannedRid, doneToday, wp.keys, routineVariants]);
+  const [rid, setRid] = useState(() => initialRid || log[dkey()]?.r || (hasFreeWorkout(seriesLog, dkey()) ? "free" : null) || (rec && rec.rid) || plannedRid || wp.nextRid || "d1");
   const [swapFor, setSwapFor] = useState(null);
-  const setSeriesLog = setSeriesLogProp || setLocalSeriesLog;
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [runLevel, setRunLevel] = usePersisted("runLevel", DEFAULT_RUN_LEVEL);
   const [fitbitShortcut] = useFitbitShortcut();
   // Hora de inicio y fin del entreno de hoy (solo en este dispositivo, para la duración del resumen).
   const [session, setSession] = usePersisted("trainSession", null);
   const [mode, setMode] = useState(null); // modo entreno abierto: { start: índice del ejercicio }
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const isFree = rid === "free";
   const activeRunLevel = getDisplayRunLevel(runLevel, today);
   const runPlan = getRunLevel(activeRunLevel);
-  const variants = variantsFor(rid);
-  const activeVariantId = resolveVariantId(rid, routineVariants);
-  const routine = routineById(rid, activeRunLevel, activeVariantId);
+  const variants = isFree ? [] : variantsFor(rid);
+  const activeVariantId = isFree ? null : resolveVariantId(rid, routineVariants);
+  const routine = isFree
+    ? { id: "free", short: "Libre", name: "Entreno libre", exercises: [], low: false }
+    : routineById(rid, activeRunLevel, activeVariantId);
   const week = block.week || 1;
   const daySets = (sets[today] || {})[rid] || {};
   const daySwaps = (swaps[today] || {})[rid] || {};
@@ -134,10 +185,13 @@ export function TrainView({ sets, setSets, seriesLog: seriesLogProp, setSeriesLo
   const logged = log[today];
   const todaySession = session && session.date === today && session.rid === rid ? session : null;
   const touch = () => setSession((s) => touchSession(s, { date: today, routineId: rid, now: Date.now() }));
-  const registerSession = () => setLog((l) => ({
-    ...l,
-    [today]: { r: rid, ...(activeVariantId ? { v: activeVariantId } : {}), at: Date.now() },
-  }));
+  const registerSession = () => {
+    if (isFree) return;
+    setLog((l) => ({
+      ...l,
+      [today]: { r: rid, ...(activeVariantId ? { v: activeVariantId } : {}), at: Date.now() },
+    }));
+  };
 
   // Cada ejercicio con lo que necesitan la tarjeta, el modo entreno y el resumen.
   const items = routine.exercises.map((ex) => {
@@ -177,8 +231,8 @@ export function TrainView({ sets, setSets, seriesLog: seriesLogProp, setSeriesLo
   useEffect(() => {
     const prev = prevProgress.current;
     prevProgress.current = { rid, vid: activeVariantId, progress };
-    if (prev.rid === rid && prev.vid === activeVariantId && total > 0 && prev.progress < 1 && progress >= 1 && todaySession) finish();
-  }, [rid, activeVariantId, total, progress]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!isFree && prev.rid === rid && prev.vid === activeVariantId && total > 0 && prev.progress < 1 && progress >= 1 && todaySession) finish();
+  }, [isFree, rid, activeVariantId, total, progress]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (hasInactivityDecay(runLevel, today)) {
@@ -187,19 +241,44 @@ export function TrainView({ sets, setSets, seriesLog: seriesLogProp, setSeriesLo
   }, [runLevel, today, setRunLevel]);
 
   useEffect(() => {
-    if (total > 0 && progress >= 1 && (!logged || logged.r !== rid || logged.v !== activeVariantId)) {
+    if (!isFree && total > 0 && progress >= 1 && (!logged || logged.r !== rid || logged.v !== activeVariantId)) {
       setLog((l) => ({
         ...l,
         [today]: { r: rid, ...(activeVariantId ? { v: activeVariantId } : {}), at: Date.now() },
       }));
     }
-  }, [total, progress, logged, rid, activeVariantId, today, setLog]);
+  }, [isFree, total, progress, logged, rid, activeVariantId, today, setLog]);
 
   useEffect(() => {
     if (logged && logged.r === "d3") {
       setRunLevel((prev) => recordRunSession(prev, { date: today, done: true }));
     }
   }, [logged, today, setRunLevel]);
+
+  // Acciones del modo entreno libre
+  const freeExIds = useMemo(() => getFreeExIds(freeSessions, seriesLog, today), [freeSessions, seriesLog, today]);
+  const handleAddFreeExercises = (ids) => {
+    if (!Array.isArray(ids) || !ids.length) return;
+    setFreeSessions((prev) => addExercisesToFreeSession(prev, { date: today, exIds: ids, maxDays: 90 }));
+  };
+  const handleCreateCustomExercise = (input) => {
+    const res = createCustomExercise(customExercises, input, Date.now());
+    if (res.error) return res;
+    setCustomExercises(res.list);
+    return res.exercise;
+  };
+  const handleSyncFreeSeries = (exId, rows) => {
+    const hasValid = Array.isArray(rows) && rows.some((r) => r && r.reps !== "" && Number.isFinite(Number(r.reps)) && Number(r.reps) > 0);
+    if (hasValid) touch();
+    setSeriesLog((all) => setFreeExerciseSeries({ setLog: all, date: today, exerciseId: exId, series: rows, maxDays: 90 }));
+  };
+  const handleMoveFreeExercise = (exId, direction) => {
+    setFreeSessions((prev) => moveExerciseInFreeSession(prev, { date: today, exId, direction, fallbackExIds: freeExIds, maxDays: 90 }));
+  };
+  const handleRemoveFreeExercise = (exId) => {
+    setFreeSessions((prev) => removeExerciseFromFreeSession(prev, { date: today, exId, maxDays: 90 }));
+    setSeriesLog((all) => removeFreeExerciseFromSetLog({ setLog: all, date: today, exerciseId: exId, maxDays: 90 }));
+  };
 
   const toggle = (ex, i, n) => {
     const exSeries = daySetLog[ex.id] || [];
@@ -327,9 +406,40 @@ export function TrainView({ sets, setSets, seriesLog: seriesLogProp, setSeriesLo
               </button>
             );
           })}
+          <button
+            type="button"
+            data-routine-chip
+            onClick={() => setRid("free")}
+            aria-pressed={isFree}
+            className={`shrink-0 rounded-2xl px-3.5 py-2.5 text-left transition ${
+              isFree ? "bg-accent/15 ring-1 ring-inset ring-accent/45" : "bg-white/[0.06] hover:bg-white/[0.1]"
+            }`}
+          >
+            <div className={`flex items-center gap-1 text-xs font-medium ${isFree ? "text-accent" : "text-muted"}`}>
+              <Dumbbell size={12} />Libre{hasFreeToday && <Check size={12} />}
+            </div>
+            <div className="whitespace-nowrap text-sm font-medium">Entreno libre</div>
+          </button>
         </div>
 
-        <Card glow={logged && logged.r === rid ? "good" : routine.low ? "cool" : "accent"}>
+        {isFree ? (
+          <FreeWorkoutView
+            today={today}
+            exIds={freeExIds}
+            customExercises={customExercises}
+            seriesLog={seriesLog}
+            fitbitShortcut={fitbitShortcut}
+            fitbitUrl={buildFitbitShortcutUrl(fitbitShortcut.name)}
+            openWarmup={openWarmup}
+            onOpenPicker={() => setPickerOpen(true)}
+            onSyncSeries={handleSyncFreeSeries}
+            onMoveExercise={handleMoveFreeExercise}
+            onRemoveExercise={handleRemoveFreeExercise}
+            onFinish={finish}
+          />
+        ) : (
+          <>
+            <Card glow={logged && logged.r === rid ? "good" : routine.low ? "cool" : "accent"}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[13px] font-medium text-muted">{routine.short} · ~{routine.minutes} min · Semana {week} {bw.label}</div>
@@ -411,29 +521,31 @@ export function TrainView({ sets, setSets, seriesLog: seriesLogProp, setSeriesLo
           )}
         </Card>
 
-        <div className="grid gap-3 2xl:grid-cols-2">
-          {items.map(({ ex, alt, done: doneArr, series: exSeries, currentLoad, last, skipped }) => (
-            <ExerciseCard
-              key={ex.id + week}
-              ex={ex}
-              alt={alt}
-              week={week}
-              done={doneArr}
-              skipped={skipped}
-              series={exSeries}
-              onToggle={(i, count) => toggle(ex, i, count)}
-              onSaveSet={(i, reps, load, count) => saveSet(ex, i, reps, load, count)}
-              onSwap={() => setSwapFor(ex.id)}
-              onRevert={() => setSwap(ex.id, null)}
-              onSkip={() => toggleSkip(ex.id)}
-              load={currentLoad}
-              onLoad={(v) => setLoad(ex.id, v)}
-              last={last}
-              onFocus={() => openMode(ex.id)}
-            />
-          ))}
-        </div>
-        {mode && activeItems.length > 0 && (
+            <div className="grid gap-3 2xl:grid-cols-2">
+              {items.map(({ ex, alt, done: doneArr, series: exSeries, currentLoad, last, skipped }) => (
+                <ExerciseCard
+                  key={ex.id + week}
+                  ex={ex}
+                  alt={alt}
+                  week={week}
+                  done={doneArr}
+                  skipped={skipped}
+                  series={exSeries}
+                  onToggle={(i, count) => toggle(ex, i, count)}
+                  onSaveSet={(i, reps, load, count) => saveSet(ex, i, reps, load, count)}
+                  onSwap={() => setSwapFor(ex.id)}
+                  onRevert={() => setSwap(ex.id, null)}
+                  onSkip={() => toggleSkip(ex.id)}
+                  load={currentLoad}
+                  onLoad={(v) => setLoad(ex.id, v)}
+                  last={last}
+                  onFocus={() => openMode(ex.id)}
+                />
+              ))}
+            </div>
+          </>
+        )}
+        {mode && !isFree && activeItems.length > 0 && (
           <WorkoutMode
             key={`${rid}:${activeVariantId || "base"}`}
             routine={routine}
@@ -452,19 +564,31 @@ export function TrainView({ sets, setSets, seriesLog: seriesLogProp, setSeriesLo
         {summaryOpen && (
           <WorkoutSummary
             routine={routine}
-            summary={buildWorkoutSummary({
-              exercises: activeItems.map((it) => ({ id: it.ex.id, name: it.view.name, reps: it.view.reps, sets: it.n })),
-              setLog: seriesLog, sets, loads, date: today, routineId: rid, session, now: Date.now(),
-            })}
-            logged={!!logged && logged.r === rid}
-            skippedCount={skippedCount}
+            isFree={isFree}
+            summary={isFree
+              ? buildFreeWorkoutSummary({ exIds: freeExIds, customExercises, setLog: seriesLog, date: today, session, now: Date.now() })
+              : buildWorkoutSummary({
+                  exercises: activeItems.map((it) => ({ id: it.ex.id, name: it.view.name, reps: it.view.reps, sets: it.n })),
+                  setLog: seriesLog, sets, loads, date: today, routineId: rid, session, now: Date.now(),
+                })}
+            logged={!isFree && !!logged && logged.r === rid}
+            skippedCount={isFree ? 0 : skippedCount}
             onRegister={registerSession}
-            onContinue={() => { setSummaryOpen(false); if (!mode) openMode(); }}
+            onContinue={() => { setSummaryOpen(false); if (!isFree && !mode) openMode(); }}
             onClose={() => setSummaryOpen(false)}
             onDone={() => { setSummaryOpen(false); setMode(null); }}
           />
         )}
-        {swapEx && (
+        {pickerOpen && (
+          <ExercisePickerSheet
+            customExercises={customExercises}
+            existingExIds={freeExIds}
+            onAddExercises={handleAddFreeExercises}
+            onCreateExercise={handleCreateCustomExercise}
+            onClose={() => setPickerOpen(false)}
+          />
+        )}
+        {swapEx && !isFree && (
           <SwapModal
             ex={swapEx}
             week={week}

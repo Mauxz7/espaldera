@@ -5,6 +5,7 @@ import { pad, dkey, fromKey, addDays, mondayOf, DAYS, DAYS_LONG, fmtShort, fmtIn
 import { GH_SEED, SAMPLE_EMAIL, parseHealth, deriveWeek, fmtRange, hideHealthWeek, findWorkoutStrain } from "../lib/health.js";
 import { computeStreak } from "../lib/planner.js";
 import { routineById } from "../data/program.js";
+import { hasFreeWorkout } from "../lib/metrics.js";
 import { WORKOUT_KINDS, KIND_LABELS, validWorkouts, lastWeeks } from "../lib/workouts.js";
 import { Card, SectionTitle, Chip, btnCls } from "../components/ui.jsx";
 import { HealthRings } from "../components/HealthRings.jsx";
@@ -209,7 +210,7 @@ export function ImportPanel({ onSave, onClose, initial }) {
   );
 }
 
-export function WorkoutsSection({ workouts, log, bevelHistory }) {
+export function WorkoutsSection({ workouts, log, bevelHistory, setLog = null }) {
   const list = useMemo(() => validWorkouts(workouts), [workouts]);
   const weekly = useMemo(() => lastWeeks(list, 8), [list]);
   const recent = useMemo(() => list.slice(0, 10), [list]);
@@ -259,6 +260,7 @@ export function WorkoutsSection({ workouts, log, bevelHistory }) {
               {recent.map((w) => {
                 const Icon = KIND_ICON[w.kind] || Activity;
                 const logged = log && log[w.date] && log[w.date].r ? routineById(log[w.date].r, undefined, log[w.date].v) : null;
+                const freeLogged = !logged && hasFreeWorkout(setLog, w.date);
                 const bevelW = findWorkoutStrain(bevelHistory, w);
                 const avgHr = w.avgHr ?? bevelW?.avgHr ?? null;
                 const strainPct = bevelW && typeof bevelW.strainPct === "number" ? bevelW.strainPct : null;
@@ -273,6 +275,7 @@ export function WorkoutsSection({ workouts, log, bevelHistory }) {
                           <span className="truncate font-medium text-fg">{w.type}</span>
                           <span className="text-xs text-muted">· {KIND_LABELS[w.kind]}</span>
                           {logged && <Chip tone="accent">{logged.short}</Chip>}
+                          {freeLogged && <Chip tone="accent">Libre</Chip>}
                         </div>
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-xs text-muted">
                           <span>{fmtShort(w.date)} · {hhmm(new Date(w.start))}</span>
@@ -301,7 +304,7 @@ export function WorkoutsSection({ workouts, log, bevelHistory }) {
   );
 }
 
-export function DashboardView({ health, setHealth, log, bevelHistory, vitals = {}, sleep = {}, workouts = [], setLog = {} }) {
+export function DashboardView({ health, setHealth, log, bevelHistory, vitals = {}, sleep = {}, workouts = [], setLog = {}, customExercises = [] }) {
   const [subTab, setSubTab] = useState("daily"); // "daily" | "weekly"
   const [activeSheet, setActiveSheet] = useState(null); // null | "recovery" | "sleep" | "strain"
   const [showImport, setShowImport] = useState(false);
@@ -357,8 +360,13 @@ export function DashboardView({ health, setHealth, log, bevelHistory, vitals = {
   const pct = (a, b) => (a != null && b ? ((a - b) / b) * 100 : null);
 
   const thisMonday = mondayOf(new Date());
-  const sessionsThisWeek = Object.keys(log).filter((k) => { const d = fromKey(k); return d >= thisMonday && d < addDays(thisMonday, 7); }).length;
-  const streak = computeStreak(log);
+  const inThisWeek = (k) => { const d = fromKey(k); return d >= thisMonday && d < addDays(thisMonday, 7); };
+  const weekDaysSet = new Set(Object.keys(log || {}).filter(inThisWeek));
+  for (const k of Object.keys(setLog || {})) {
+    if (inThisWeek(k) && hasFreeWorkout(setLog, k)) weekDaysSet.add(k);
+  }
+  const sessionsThisWeek = weekDaysSet.size;
+  const streak = computeStreak(log, setLog);
 
   const recent = weeks.slice(-12);
   const offset = weeks.length - recent.length;
@@ -448,6 +456,7 @@ export function DashboardView({ health, setHealth, log, bevelHistory, vitals = {
               workouts={workouts}
               setLog={setLog}
               log={log}
+              customExercises={customExercises}
               selectedDate={selectedDate}
               todayKey={todayKey}
             />
@@ -457,7 +466,7 @@ export function DashboardView({ health, setHealth, log, bevelHistory, vitals = {
               selectedDate={selectedDate}
               todayKey={todayKey}
             />
-            <WorkoutsSection workouts={workouts} log={log} bevelHistory={bevelHistory} />
+            <WorkoutsSection workouts={workouts} log={log} setLog={setLog} bevelHistory={bevelHistory} />
             {activeSheet && (
               <HealthSheets
                 activeSheet={activeSheet}
@@ -484,7 +493,7 @@ export function DashboardView({ health, setHealth, log, bevelHistory, vitals = {
                 <p className="text-sm text-muted">No hay semanas en el historial.</p>
                 <button onClick={() => setShowImport(true)} className={btnCls("primary", "mt-3")}><ClipboardPaste size={16} />Importar correo</button>
               </Card>
-              <WorkoutsSection workouts={workouts} log={log} bevelHistory={bevelHistory} />
+              <WorkoutsSection workouts={workouts} log={log} setLog={setLog} bevelHistory={bevelHistory} />
             </div>
           ) : (
             <div className="space-y-5">

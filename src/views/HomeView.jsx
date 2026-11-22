@@ -15,7 +15,7 @@ import { ReviewCard } from "../components/ReviewCard.jsx";
 import { HabitsMini } from "../components/Habits.jsx";
 import { useFitbitShortcut, buildFitbitShortcutUrl } from "../components/FitbitShortcutCard.jsx";
 
-export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBlock, goTrain, goHealth, wins, setWins, reviews, openReview, routineVariants, bevelHistory }) {
+export function HomeView({ wp, log, setLog = null, habits, setHabits, habitDefs, block, setBlock, goTrain, goHealth, wins, setWins, reviews, openReview, routineVariants, bevelHistory }) {
   const today = dkey();
   const [workouts] = usePersisted("workouts", []);
   const [fitbit] = useFitbitShortcut();
@@ -25,8 +25,8 @@ export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBloc
   const plan = todayPlan({ info, logged: log[today], fromFitbit: wp.fromFitbit && wp.fromFitbit[wp.todayIdx] });
   const routine = plan.rid ? getActiveRoutine(plan.rid, { routineVariants: plan.state === "done" && log[today]?.v ? { [plan.rid]: log[today].v } : routineVariants }) : null;
   const prog = useMemo(
-    () => weekProgress({ keys: wp.keys, todayIdx: wp.todayIdx, fixed: wp.fixed, habits, habitDefs, workouts }),
-    [wp.keys, wp.todayIdx, wp.fixed, habits, habitDefs, workouts],
+    () => weekProgress({ keys: wp.keys, todayIdx: wp.todayIdx, fixed: wp.fixed, habits, habitDefs, workouts, setLog }),
+    [wp.keys, wp.todayIdx, wp.fixed, habits, habitDefs, workouts, setLog],
   );
   const week = (block && block.week) || 1;
   const bw = BLOCK_WEEKS[week - 1];
@@ -166,7 +166,7 @@ export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBloc
             <HabitsMini habits={habits} setHabits={setHabits} habitDefs={habitDefs} />
           </Card>
         </div>
-        <IdentityCard wp={wp} log={log} habits={habits} habitDefs={habitDefs} />
+        <IdentityCard wp={wp} log={log} setLog={setLog} habits={habits} habitDefs={habitDefs} />
         <ReviewCard wins={wins} setWins={setWins} reviews={reviews} onOpenReview={openReview} />
         <BlockCard block={block} setBlock={setBlock} />
       </aside>

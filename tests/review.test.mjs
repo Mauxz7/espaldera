@@ -174,4 +174,23 @@ test("buildWeekReview integra votos por identidad, sesiones, Fitbit, hábitos, d
   assert.equal(byId.lector, 1);
   // estudiante: 1 día con dopamina buena (lun) = 1
   assert.equal(byId.estudiante, 1);
+
+  // Entreno libre el martes (sin log ni Fitbit ese día) suma sesión y voto de atleta
+  const withFree = buildWeekReview({
+    mondayKey: mk,
+    today: "2026-11-11",
+    habits,
+    habitDefs,
+    identities: DEFAULT_IDENTITIES,
+    log,
+    setLog: { "2026-11-10": { free: { lib_trx_curl: [{ reps: 12, load: "10 kg" }] } } },
+    workouts,
+    dopamine,
+    dopamineDefs,
+    sleep,
+    wins,
+    reviews,
+  });
+  assert.equal(withFree.sessions.value, 3);
+  assert.equal(withFree.votes.find((r) => r.id === "atleta").votes, 6);
 });

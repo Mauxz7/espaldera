@@ -3,6 +3,7 @@ import { usePersisted } from "./storage.js";
 import { dkey, fromKey, addDays, mondayOf, dayDiff, pruneDays, DAYS_LONG } from "./dates.js";
 import { routineById } from "../data/program.js";
 import { calNight, calExamSoon } from "./calendar.js";
+import { hasFreeWorkout } from "./metrics.js";
 
 export const MAIN = ["d1", "d2", "d3", "d4"];
 
@@ -496,8 +497,12 @@ export function useWeekPlan(log, opts = {}) {
   return { ...ws, todayIdx, shuffle, toggleOffice, toggleNight, info, nextRid, late, upcoming };
 }
 
-export function computeStreak(log) {
-  const keys = Object.keys(log || {}).sort().reverse();
+export function computeStreak(log, setLog = null) {
+  const daySet = new Set(Object.keys(log || {}));
+  for (const k of Object.keys(setLog || {})) {
+    if (hasFreeWorkout(setLog, k)) daySet.add(k);
+  }
+  const keys = [...daySet].sort().reverse();
   if (!keys.length) return 0;
   if (dayDiff(dkey(), keys[0]) > 3) return 0;
   let n = 1;

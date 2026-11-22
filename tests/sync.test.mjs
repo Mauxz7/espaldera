@@ -124,3 +124,25 @@ test("SYNC_KEYS incluye vitals y healthPrefs con retrocompatibilidad cuando falt
   assert.deepEqual(await b.read("vitals"), vitalsSample);
   assert.deepEqual(await b.read("healthPrefs"), prefsSample);
 });
+
+test("SYNC_KEYS incluye customExercises y freeSessions y se sincronizan con retrocompatibilidad", async () => {
+  const { SYNC_KEYS } = await import("../src/lib/storage.js");
+  assert.ok(SYNC_KEYS.includes("customExercises"));
+  assert.ok(SYNC_KEYS.includes("freeSessions"));
+
+  const oldDev = await device("o");
+  await oldDev.sync();
+  assert.equal(await oldDev.read("customExercises"), undefined);
+  assert.equal(await oldDev.read("freeSessions"), undefined);
+
+  const a = await device("p");
+  const b = await device("q");
+  const customSample = [{ id: "cus_1", name: "Curl barra", primaryGroup: "biceps", secondaryGroups: [] }];
+  const freeSample = { "2026-11-22": { exIds: ["cus_1"] } };
+  await a.write("customExercises", customSample, 7000);
+  await a.write("freeSessions", freeSample, 7000);
+  await a.sync();
+  await b.sync();
+  assert.deepEqual(await b.read("customExercises"), customSample);
+  assert.deepEqual(await b.read("freeSessions"), freeSample);
+});

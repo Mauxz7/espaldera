@@ -17,7 +17,7 @@ import { Card, SectionTitle, btnCls } from "../components/ui.jsx";
 
 // Vista «Revisión semanal»: cierre de domingo y frasco de logros.
 // No aparece en la barra inferior; se abre desde la tarjeta en Inicio o desde el aviso semanal.
-export function ReviewView({ wp, log, habits, habitDefs, wins, setWins, reviews, setReviews, onBack }) {
+export function ReviewView({ wp, log, setLog = null, habits, habitDefs, wins, setWins, reviews, setReviews, onBack }) {
   const [workouts] = usePersisted("workouts", []);
   const [identities] = usePersisted("identities", DEFAULT_IDENTITIES);
   const [dopamine] = usePersisted("dopamine", {});
@@ -44,6 +44,7 @@ export function ReviewView({ wp, log, habits, habitDefs, wins, setWins, reviews,
         habitDefs,
         identities,
         log,
+        setLog,
         workouts,
         weekPlan,
         dopamine,
@@ -52,7 +53,7 @@ export function ReviewView({ wp, log, habits, habitDefs, wins, setWins, reviews,
         wins,
         reviews,
       }),
-    [activeKey, isCurrent, wp.todayIdx, wp.fixed, wp.fromFitbit, habits, habitDefs, identities, log, workouts, weekPlan, dopamine, dopamineDefs, sleep, wins, reviews],
+    [activeKey, isCurrent, wp.todayIdx, wp.fixed, wp.fromFitbit, habits, habitDefs, identities, log, setLog, workouts, weekPlan, dopamine, dopamineDefs, sleep, wins, reviews],
   );
 
   const [winText, setWinText] = useState("");

@@ -43,7 +43,7 @@ function Segments({ frac, tone }) {
  * Hoja «Grupos musculares»: mapa corporal + lista con Frescura / Carga / Volumen,
  * filtro por estado y navegación por días.
  */
-export function MuscleGroupsSheet({ setLog, log, workouts, initialDate, todayKey, onClose }) {
+export function MuscleGroupsSheet({ setLog, log, workouts, customExercises = [], initialDate, todayKey, onClose }) {
   const today = todayKey || dkey();
   const [date, setDate] = useState(initialDate || today);
   const [tab, setTab] = useState("fresh");
@@ -52,8 +52,8 @@ export function MuscleGroupsSheet({ setLog, log, workouts, initialDate, todayKey
   const [picked, setPicked] = useState(null);
 
   const { groups, counts } = useMemo(
-    () => muscleGroups(setLog, date, { log, workouts }),
-    [setLog, log, workouts, date],
+    () => muscleGroups(setLog, date, { log, workouts, customExercises }),
+    [setLog, log, workouts, customExercises, date],
   );
   const maxSets = Math.max(1, ...groups.map((g) => g.sets));
   const maxReps = Math.max(1, ...groups.map((g) => g.reps));

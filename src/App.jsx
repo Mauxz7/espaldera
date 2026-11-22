@@ -55,6 +55,8 @@ export default function App() {
   const [reviews, setReviews] = usePersisted("reviews", {});
   const [routineVariants, setRoutineVariants] = usePersisted("routineVariants", {});
   const [skips, setSkips] = usePersisted("skips", {});
+  const [customExercises, setCustomExercises] = usePersisted("customExercises", []);
+  const [freeSessions, setFreeSessions] = usePersisted("freeSessions", {});
   const [sleep] = usePersisted("sleep", {}); // de Fitbit; solo lectura
   const [workouts] = usePersisted("workouts", []); // de Fitbit; solo lectura
   const [vitals] = usePersisted("vitals", {}); // de Fitbit; solo lectura
@@ -140,10 +142,10 @@ export default function App() {
           <SyncBadge />
         </header>
         <div className="mx-auto max-w-6xl">
-          {tab === "home" && <HomeView wp={wp} log={log} habits={habits} setHabits={setHabits} habitDefs={habitDefs} block={block} setBlock={setBlock} goTrain={goTrain} goHealth={goHealth} wins={wins} setWins={setWins} reviews={reviews} openReview={openReview} routineVariants={routineVariants} bevelHistory={bevelHistory} />}
-          {tab === "review" && <ReviewView wp={wp} log={log} habits={habits} habitDefs={habitDefs} wins={wins} setWins={setWins} reviews={reviews} setReviews={setReviews} onBack={goHome} />}
-          {tab === "train" && <TrainView key={trainRid || "auto"} initialRid={trainRid} sets={sets} setSets={setSets} seriesLog={seriesLog} setSeriesLog={setSeriesLog} log={log} setLog={setLog} block={block} swaps={swaps} setSwaps={setSwaps} loads={loads} setLoads={setLoads} lastLoads={lastLoads} setLastLoads={setLastLoads} routineVariants={routineVariants} setRoutineVariants={setRoutineVariants} skips={skips} setSkips={setSkips} startTimer={startTimer} openWarmup={() => setWarmup(true)} wp={wp} bevelHistory={bevelHistory} />}
-          {tab === "fitbit" && <DashboardView health={health} setHealth={setHealth} log={log} bevelHistory={bevelHistory} vitals={vitals} sleep={sleep} workouts={workouts} setLog={seriesLog} />}
+          {tab === "home" && <HomeView wp={wp} log={log} setLog={seriesLog} habits={habits} setHabits={setHabits} habitDefs={habitDefs} block={block} setBlock={setBlock} goTrain={goTrain} goHealth={goHealth} wins={wins} setWins={setWins} reviews={reviews} openReview={openReview} routineVariants={routineVariants} bevelHistory={bevelHistory} />}
+          {tab === "review" && <ReviewView wp={wp} log={log} setLog={seriesLog} habits={habits} habitDefs={habitDefs} wins={wins} setWins={setWins} reviews={reviews} setReviews={setReviews} onBack={goHome} />}
+          {tab === "train" && <TrainView key={trainRid || "auto"} initialRid={trainRid} sets={sets} setSets={setSets} seriesLog={seriesLog} setSeriesLog={setSeriesLog} log={log} setLog={setLog} block={block} swaps={swaps} setSwaps={setSwaps} loads={loads} setLoads={setLoads} lastLoads={lastLoads} setLastLoads={setLastLoads} routineVariants={routineVariants} setRoutineVariants={setRoutineVariants} skips={skips} setSkips={setSkips} customExercises={customExercises} setCustomExercises={setCustomExercises} freeSessions={freeSessions} setFreeSessions={setFreeSessions} startTimer={startTimer} openWarmup={() => setWarmup(true)} wp={wp} bevelHistory={bevelHistory} />}
+          {tab === "fitbit" && <DashboardView health={health} setHealth={setHealth} log={log} bevelHistory={bevelHistory} vitals={vitals} sleep={sleep} workouts={workouts} setLog={seriesLog} customExercises={customExercises} />}
           {tab === "settings" && <SettingsView habitDefs={habitDefs} setHabitDefs={setHabitDefs} reminderCard={<ReminderCard rem={rem} />} healthPrefs={healthPrefs} setHealthPrefs={setHealthPrefs} />}
           {tab === "habits" && <HabitsView habits={habits} setHabits={setHabits} habitDefs={habitDefs} tomorrow={wp.info(dkey(addDays(new Date(), 1)))} tonight={wp.info(dkey())} routineVariants={routineVariants} />}
         </div>

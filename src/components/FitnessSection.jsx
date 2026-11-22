@@ -115,7 +115,7 @@ function SemiGaugeCard({ title, icon: Icon, load, onClick }) {
 /**
  * Sección Fitness dentro de Salud: Carga cardio, Carga muscular, Cardio Focus y Frescura muscular.
  */
-export function FitnessSection({ bevelHistory, workouts, setLog, log, selectedDate, todayKey }) {
+export function FitnessSection({ bevelHistory, workouts, setLog, log, customExercises = [], selectedDate, todayKey }) {
   const [openLoad, setOpenLoad] = useState(null); // null | "cardio" | "muscular"
   const [openMuscles, setOpenMuscles] = useState(false);
 
@@ -128,8 +128,8 @@ export function FitnessSection({ bevelHistory, workouts, setLog, log, selectedDa
     [workouts, selectedDate],
   );
   const muscles = useMemo(
-    () => muscleGroups(setLog, selectedDate, { log, workouts }),
-    [setLog, log, workouts, selectedDate],
+    () => muscleGroups(setLog, selectedDate, { log, workouts, customExercises }),
+    [setLog, log, workouts, customExercises, selectedDate],
   );
   const tiredest = muscles.groups.filter((g) => g.status !== "recovered").sort((a, b) => a.pct - b.pct).slice(0, 3);
   const previewColor = (group) => {
@@ -260,6 +260,7 @@ export function FitnessSection({ bevelHistory, workouts, setLog, log, selectedDa
           setLog={setLog}
           log={log}
           workouts={workouts}
+          customExercises={customExercises}
           initialDate={selectedDate}
           todayKey={todayKey}
           onClose={() => setOpenMuscles(false)}
