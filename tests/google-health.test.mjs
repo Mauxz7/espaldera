@@ -43,8 +43,10 @@ test("toWorkout traduce un entreno de Google Health al formato de la app y extra
     source: "google",
     km: 3.22,
     kcal: 120,
+    noHr: true,
   });
   const w = toWorkout(lift);
+  assert.equal(w.noHr, true);
   assert.deepEqual([w.kind, w.type, w.min, "km" in w, "avgHr" in w, "zones" in w], ["strength", "Pesas", 45, false, false, false]);
   assert.equal(toWorkout({ exercise: { interval: { startTime: "2026-11-10T12:00:00Z" }, exerciseType: "INDOOR_BIKING" } }).kind, "bike");
   assert.equal(toWorkout({ exercise: { interval: { startTime: "2026-11-10T12:00:00Z" }, exerciseType: "TREADMILL_RUNNING" } }).kind, "run");
@@ -99,7 +101,19 @@ test("toWorkout traduce un entreno de Google Health al formato de la app y extra
 test("sinceDate usa el último entreno de Google con margen, o 60 días la primera vez", () => {
   const now = new Date("2026-11-12T20:00:00Z");
   assert.equal(sinceDate([], now), "2026-09-13");
-  assert.equal(sinceDate([{ start: "2026-11-11T00:00:00.000Z", source: "google" }, { start: "2026-11-12T00:00:00.000Z" }], now), "2026-11-08");
+  assert.equal(sinceDate([{ start: "2026-11-11T00:00:00.000Z", source: "google", avgHr: 120 }, { start: "2026-11-12T00:00:00.000Z" }], now), "2026-11-08");
+});
+
+test("sinceDate vuelve a pedir una vez los entrenos viejos guardados sin pulso ni marca noHr", () => {
+  const now = new Date("2026-11-22T20:00:00Z");
+  const list = [
+    { start: "2026-11-21T19:05:00.000Z", source: "google", avgHr: 142 },
+    { start: "2026-10-01T12:00:00.000Z", source: "google" },
+    { start: "2026-09-13T06:04:00.000Z", source: "google", noHr: true },
+  ];
+  assert.equal(sinceDate(list, now), "2026-09-30");
+  list[1].noHr = true;
+  assert.equal(sinceDate(list, now), "2026-11-18");
 });
 
 function fakeFetch({ pages = [[walk, lift]], tokenOk = true } = {}) {

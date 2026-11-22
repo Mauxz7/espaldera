@@ -110,13 +110,20 @@ export function toWorkout(dp) {
     const zones = extractZones(ms.heartRateZoneDurations);
     if (zones) w.zones = zones;
   }
+  // Marca explícita: Fitbit no midió pulso en este entreno. Así sinceDate no lo vuelve a pedir.
+  if (!w.avgHr && !w.zones) w.noHr = true;
   return w;
 }
 
 // Fecha civil (AAAA-MM-DD) desde la que pedir entrenos.
 export function sinceDate(list, now = new Date()) {
-  const last = (Array.isArray(list) ? list : []).filter((w) => w && w.source === "google").map((w) => w.start).sort().pop();
-  const from = last ? new Date(last).getTime() - OVERLAP_DAYS * 86400000 : now.getTime() - FIRST_DAYS * 86400000;
+  const google = (Array.isArray(list) ? list : []).filter((w) => w && w.source === "google");
+  const last = google.map((w) => w.start).sort().pop();
+  let from = last ? new Date(last).getTime() - OVERLAP_DAYS * 86400000 : now.getTime() - FIRST_DAYS * 86400000;
+  // Relleno: entrenos guardados antes de que se leyeran pulso y zonas (sin avgHr ni noHr)
+  // se vuelven a pedir una vez; después quedan con datos o con noHr.
+  const pending = google.filter((w) => !w.avgHr && !w.zones && !w.noHr).map((w) => w.start).sort()[0];
+  if (pending) from = Math.min(from, new Date(pending).getTime() - 86400000);
   return new Date(from).toISOString().slice(0, 10);
 }
 
