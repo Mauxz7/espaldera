@@ -447,6 +447,7 @@ export function DashboardView({ health, setHealth, log, bevelHistory, vitals = {
               bevelHistory={bevelHistory}
               workouts={workouts}
               setLog={setLog}
+              log={log}
               selectedDate={selectedDate}
               todayKey={todayKey}
             />

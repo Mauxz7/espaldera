@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Check, Zap, BatteryLow, Trophy, Watch, Play, Flag } from "lucide-react";
 import { dkey, pruneDays } from "../lib/dates.js";
 import { usePersisted } from "../lib/storage.js";
@@ -14,13 +14,25 @@ import { WorkoutMode } from "../components/WorkoutMode.jsx";
 import { WorkoutSummary } from "../components/WorkoutSummary.jsx";
 import { touchSession, finishSession, buildWorkoutSummary, nextPendingExercise } from "../lib/workout.js";
 import { useFitbitShortcut, buildFitbitShortcutUrl } from "../components/FitbitShortcutCard.jsx";
+import { TrainRecommendation } from "../components/TrainRecommendation.jsx";
+import { muscleGroups, recommendTraining } from "../lib/metrics.js";
 
-export function TrainView({ sets, setSets, seriesLog: seriesLogProp, setSeriesLog: setSeriesLogProp, log, setLog, block, swaps, setSwaps, loads, setLoads, lastLoads, setLastLoads, routineVariants, setRoutineVariants, skips, setSkips, startTimer, openWarmup, wp, initialRid }) {
+export function TrainView({ sets, setSets, seriesLog: seriesLogProp, setSeriesLog: setSeriesLogProp, log, setLog, block, swaps, setSwaps, loads, setLoads, lastLoads, setLastLoads, routineVariants, setRoutineVariants, skips, setSkips, startTimer, openWarmup, wp, initialRid, bevelHistory }) {
   const today = dkey();
-  const [rid, setRid] = useState(() => initialRid || log[dkey()]?.r || wp.arr[wp.todayIdx] || wp.nextRid || "d1");
-  const [swapFor, setSwapFor] = useState(null);
   const [localSeriesLog, setLocalSeriesLog] = usePersisted("setLog", {});
   const seriesLog = seriesLogProp !== undefined ? seriesLogProp : localSeriesLog;
+  const [workouts] = usePersisted("workouts", []);
+  // Recomendación del día: frescura muscular + recuperación + lo ya hecho esta semana.
+  const plannedRid = wp.arr[wp.todayIdx] || null;
+  const rec = useMemo(() => {
+    const { groups } = muscleGroups(seriesLog, today, { log, workouts });
+    const r = bevelHistory?.byDate?.[today]?.recovery;
+    const recovery = r && r.mode !== "missing" && typeof r.score === "number" ? r.score : null;
+    const weekDone = (wp.keys || []).filter((k) => k < today).map((k) => log[k]?.r).filter(Boolean);
+    return recommendTraining({ groups, recovery, plannedRid, doneToday: log[today]?.r || null, weekDone, routineVariants });
+  }, [seriesLog, log, workouts, bevelHistory, today, plannedRid, wp.keys, routineVariants]);
+  const [rid, setRid] = useState(() => initialRid || log[dkey()]?.r || (rec && rec.rid) || plannedRid || wp.nextRid || "d1");
+  const [swapFor, setSwapFor] = useState(null);
   const setSeriesLog = setSeriesLogProp || setLocalSeriesLog;
   const [runLevel, setRunLevel] = usePersisted("runLevel", DEFAULT_RUN_LEVEL);
   const [fitbitShortcut] = useFitbitShortcut();
@@ -302,6 +314,8 @@ export function TrainView({ sets, setSets, seriesLog: seriesLogProp, setSeriesLo
   return (
     <div>
       <div className="min-w-0 space-y-5">
+        <TrainRecommendation rec={rec} rid={rid} plannedRid={plannedRid} routineVariants={routineVariants} runLevel={activeRunLevel} onPick={setRid} />
+
         <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
           {ROUTINES.map((r) => {
             const chipRoutine = routineById(r.id, activeRunLevel, resolveVariantId(r.id, routineVariants));

@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { Flame, Dumbbell, HeartPulse, ShieldCheck } from "lucide-react";
-import { trainingLoads, cardioFocus, muscleFreshness } from "../lib/metrics.js";
-import { fmtShort } from "../lib/dates.js";
+import { Flame, Dumbbell, HeartPulse, ChevronRight } from "lucide-react";
+import { trainingLoads, cardioFocus, muscleGroups, FRESH_STATUS } from "../lib/metrics.js";
 import { Card, SectionTitle, StatusDot } from "./ui.jsx";
 import { LOAD_STATUS_META, TrainingLoadSheet } from "./TrainingLoadSheet.jsx";
+import { MuscleGroupsSheet } from "./MuscleGroupsSheet.jsx";
+import { BodyMap, TONE_RGB } from "./BodyMap.jsx";
 
 function semiPoint(cx, cy, r, frac) {
   const theta = Math.PI * (1 - frac);
@@ -111,17 +112,12 @@ function SemiGaugeCard({ title, icon: Icon, load, onClick }) {
   );
 }
 
-function freshnessColors(pct) {
-  if (pct >= 80) return { bar: "bg-good", text: "text-good" };
-  if (pct >= 50) return { bar: "bg-accent", text: "text-accent" };
-  return { bar: "bg-warn", text: "text-warn" };
-}
-
 /**
  * Sección Fitness dentro de Salud: Carga cardio, Carga muscular, Cardio Focus y Frescura muscular.
  */
-export function FitnessSection({ bevelHistory, workouts, setLog, selectedDate, todayKey }) {
+export function FitnessSection({ bevelHistory, workouts, setLog, log, selectedDate, todayKey }) {
   const [openLoad, setOpenLoad] = useState(null); // null | "cardio" | "muscular"
+  const [openMuscles, setOpenMuscles] = useState(false);
 
   const loads = useMemo(
     () => trainingLoads(bevelHistory, selectedDate),
@@ -131,10 +127,17 @@ export function FitnessSection({ bevelHistory, workouts, setLog, selectedDate, t
     () => cardioFocus(workouts, selectedDate, { days: 30 }),
     [workouts, selectedDate],
   );
-  const freshness = useMemo(
-    () => muscleFreshness(setLog, selectedDate),
-    [setLog, selectedDate],
+  const muscles = useMemo(
+    () => muscleGroups(setLog, selectedDate, { log, workouts }),
+    [setLog, log, workouts, selectedDate],
   );
+  const tiredest = muscles.groups.filter((g) => g.status !== "recovered").sort((a, b) => a.pct - b.pct).slice(0, 3);
+  const previewColor = (group) => {
+    const g = muscles.groups.find((x) => x.group === group);
+    if (!g) return null;
+    if (!g.trained) return { fill: "rgb(255 255 255)", opacity: 0.1 };
+    return { fill: TONE_RGB[FRESH_STATUS[g.status].tone], opacity: 0.35 + 0.6 * (g.pct / 100) };
+  };
 
   const focusTotalMin = focus
     ? Math.round((focus.minutes.light || 0) + (focus.minutes.moderate || 0) + (focus.minutes.vigorous || 0) + (focus.minutes.peak || 0))
@@ -225,57 +228,43 @@ export function FitnessSection({ bevelHistory, workouts, setLog, selectedDate, t
         </Card>
       </div>
 
-      {/* Tarjeta Frescura muscular (11 grupos) */}
+      {/* Grupos musculares: vista previa que abre la hoja con mapa corporal */}
       <div>
-        <SectionTitle>Frescura muscular</SectionTitle>
-        <Card className="min-w-0">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted">
-              <ShieldCheck size={15} className="text-good" aria-hidden="true" />
-              <span>Recuperación por grupo</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-2.5 text-[11px] text-muted">
-              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-good" />≥80%</span>
-              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-accent" />50–79%</span>
-              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-warn" />&lt;50%</span>
+        <SectionTitle aside="Toca para ver el detalle">Grupos musculares</SectionTitle>
+        <Card as="button" type="button" onClick={() => setOpenMuscles(true)} className="block w-full min-w-0 text-left transition active:scale-[0.99]" aria-label="Abrir grupos musculares">
+          <div className="flex items-center gap-4">
+            <BodyMap colorFor={previewColor} className="w-[148px] shrink-0 [&_figcaption]:hidden" />
+            <div className="min-w-0 flex-1 space-y-2.5">
+              <div className="space-y-1">
+                <StatusDot tone="good">{muscles.counts.recovered} recuperados</StatusDot>
+                <div><StatusDot tone="accent">{muscles.counts.fatigued} fatigados</StatusDot></div>
+                <div><StatusDot tone="warn">{muscles.counts.depleted} agotados</StatusDot></div>
+              </div>
+              {tiredest.length > 0 ? (
+                <div className="border-t border-line pt-2 text-xs text-muted">
+                  {tiredest.map((g) => (
+                    <div key={g.group} className="flex justify-between gap-2"><span className="truncate">{g.label}</span><span className="font-mono font-bold text-fg">{g.pct} %</span></div>
+                  ))}
+                </div>
+              ) : (
+                <p className="border-t border-line pt-2 text-xs text-muted">Todo listo para entrenar.</p>
+              )}
+              <div className="inline-flex items-center gap-0.5 text-xs font-semibold text-accent">Ver grupos<ChevronRight size={14} /></div>
             </div>
           </div>
-
-          <ul className="divide-y divide-line sm:grid sm:grid-cols-2 sm:gap-x-6 sm:divide-y-0">
-            {freshness.map((g) => {
-              const colors = freshnessColors(g.pct);
-              return (
-                <li key={g.group} className="min-w-0 py-2.5 first:pt-0 last:pb-0 sm:border-b sm:border-line sm:py-2.5 sm:first:pt-2.5 sm:last:pb-2.5">
-                  <div className="flex items-baseline justify-between gap-2 text-xs">
-                    <span className="truncate font-medium text-fg">{g.label}</span>
-                    <div className="flex shrink-0 items-baseline gap-2 font-mono tabular-nums">
-                      {g.sets > 0 && (
-                        <span className="text-[11px] text-muted">
-                          {g.sets} ser.{g.lastDate ? ` · ${fmtShort(g.lastDate)}` : ""}
-                        </span>
-                      )}
-                      <span className={`font-bold ${colors.text}`}>{g.pct}%</span>
-                    </div>
-                  </div>
-                  <div
-                    className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-white/[0.07]"
-                    role="progressbar"
-                    aria-label={`${g.label}: ${g.pct}% recuperado`}
-                    aria-valuenow={g.pct}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                  >
-                    <div
-                      className={`h-full rounded-full transition-all duration-300 ${colors.bar}`}
-                      style={{ width: `${g.pct}%` }}
-                    />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
         </Card>
       </div>
+
+      {openMuscles && (
+        <MuscleGroupsSheet
+          setLog={setLog}
+          log={log}
+          workouts={workouts}
+          initialDate={selectedDate}
+          todayKey={todayKey}
+          onClose={() => setOpenMuscles(false)}
+        />
+      )}
 
       {openLoad && (
         <TrainingLoadSheet
