@@ -7,6 +7,7 @@ import { DEFAULT_HABIT_DEFS, isHabitDoneOrMini } from "../data/habits.js";
 import { DEFAULT_IDENTITIES, IDENTITY_COLORS, ATHLETE_ID, habitIdentity } from "../data/identities.js";
 import { normalizeDopamineDefs, isGoalMet } from "./dopamine.js";
 import { isRested } from "./sleep.js";
+import { hasFreeWorkout } from "./metrics.js";
 
 export const REST_ID = "descanso";
 
@@ -34,7 +35,7 @@ export function normalizeIdentities(list) {
 // - votes: hábitos cumplidos + sesiones registradas + 1 por día por elemento de dopamina buena;
 //   days: días con al menos un voto.
 // Los hábitos archivados, sin identidad o con una identidad que ya no existe no votan.
-export function weekVotes({ keys, todayIdx, habits, habitDefs, identities, log, fromFitbit, dopamine, dopamineDefs, sleep }) {
+export function weekVotes({ keys, todayIdx, habits, habitDefs, identities, log, fromFitbit, dopamine, dopamineDefs, sleep, setLog = null }) {
   const ids = normalizeIdentities(identities);
   const defs = (Array.isArray(habitDefs) ? habitDefs : DEFAULT_HABIT_DEFS).filter((d) => d && d.id && !d.archived);
   const dopaDefs = normalizeDopamineDefs(dopamineDefs).filter((d) => d.kind === "good" && d.identity);
@@ -48,7 +49,7 @@ export function weekVotes({ keys, todayIdx, habits, habitDefs, identities, log, 
     const add = (id) => { if (byId.has(id)) dayVotes.set(id, (dayVotes.get(id) || 0) + 1); };
     const h = (habits || {})[k] || {};
     defs.forEach((d) => { if (isHabitDoneOrMini(d, h)) add(habitIdentity(d)); });
-    if ((log && log[k]) || (fromFitbit && fromFitbit[i])) add(ATHLETE_ID); // sesión hecha en Shift o registrada solo con Fitbit
+    if ((log && log[k]) || (fromFitbit && fromFitbit[i]) || hasFreeWorkout(setLog, k)) add(ATHLETE_ID); // sesión hecha en Shift (rutina o libre) o registrada solo con Fitbit
     const dopaDay = (dopamine || {})[k] || {};
     dopaDefs.forEach((d) => { if (isGoalMet(d, Number(dopaDay[d.id]) || 0)) add(d.identity); });
     if (isRested(sleep && sleep[k])) add(REST_ID); // la noche que terminó ese día

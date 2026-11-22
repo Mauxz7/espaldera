@@ -8,14 +8,14 @@ import { Card, SectionTitle } from "./ui.jsx";
 
 // Tarjeta de Inicio: votos de la semana por identidad (barras horizontales)
 // y la frase de la identidad con más votos.
-export function IdentityCard({ wp, log, habits, habitDefs }) {
+export function IdentityCard({ wp, log, habits, habitDefs, setLog = null }) {
   const [identities] = usePersisted("identities", DEFAULT_IDENTITIES);
   const [dopamine] = usePersisted("dopamine", {});
   const [dopamineDefs] = usePersisted("dopamineDefs", DEFAULT_DOPAMINE_DEFS);
   const [sleep] = usePersisted("sleep", null);
   const rows = useMemo(
-    () => weekVotes({ keys: wp.keys, todayIdx: wp.todayIdx, habits, habitDefs, identities, log, fromFitbit: wp.fromFitbit, dopamine, dopamineDefs, sleep }),
-    [wp.keys, wp.todayIdx, habits, habitDefs, identities, log, wp.fromFitbit, dopamine, dopamineDefs, sleep],
+    () => weekVotes({ keys: wp.keys, todayIdx: wp.todayIdx, habits, habitDefs, identities, log, setLog, fromFitbit: wp.fromFitbit, dopamine, dopamineDefs, sleep }),
+    [wp.keys, wp.todayIdx, habits, habitDefs, identities, log, setLog, wp.fromFitbit, dopamine, dopamineDefs, sleep],
   );
   const top = topIdentity(rows);
   const max = Math.max(1, ...rows.map((r) => r.votes));

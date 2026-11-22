@@ -182,9 +182,55 @@ export const PATTERN_MUSCLES = Object.freeze({
   run: { calves: 0.5, quads: 0.5 },
 });
 
+const GROUP_TO_PATTERN = Object.freeze({
+  chest: "push_h",
+  lats: "pull_v",
+  upperBack: "pull_h",
+  shoulders: "push_v",
+  biceps: "arms",
+  triceps: "arms",
+  core: "core",
+  quads: "squat",
+  glutes: "hinge",
+  hamstrings: "hinge",
+  calves: "run",
+});
+
+function findCustomExercise(exId, customExercises) {
+  if (!exId || typeof exId !== "string" || !customExercises) return null;
+  if (Array.isArray(customExercises)) {
+    return customExercises.find((c) => c && c.id === exId) || null;
+  }
+  if (typeof customExercises === "object") {
+    return customExercises[exId] || null;
+  }
+  return null;
+}
+
+function customExerciseMuscles(custom) {
+  if (!custom || typeof custom !== "object") return null;
+  if (custom.muscles && typeof custom.muscles === "object") {
+    const entries = Object.entries(custom.muscles).filter(([g, w]) => MUSCLE_GROUPS[g] && isNum(w) && w > 0);
+    if (entries.length) return Object.fromEntries(entries);
+  }
+  if (custom.primaryGroup && MUSCLE_GROUPS[custom.primaryGroup]) {
+    const out = { [custom.primaryGroup]: 1 };
+    for (const g of Array.isArray(custom.secondaryGroups) ? custom.secondaryGroups : []) {
+      if (g !== custom.primaryGroup && MUSCLE_GROUPS[g] && out[g] == null) out[g] = 0.5;
+    }
+    return out;
+  }
+  return null;
+}
+
 let patternIndex = null;
-/** Mapa id de ejercicio → patrón (rutinas, variantes, día 3, sustitutos y biblioteca). */
-export function exercisePattern(exId) {
+/** Mapa id de ejercicio → patrón (rutinas, variantes, día 3, sustitutos, biblioteca y personalizados). */
+export function exercisePattern(exId, customExercises = null) {
+  if (!exId || typeof exId !== "string") return null;
+  const custom = findCustomExercise(exId, customExercises);
+  if (custom) {
+    return custom.pattern || GROUP_TO_PATTERN[custom.primaryGroup] || null;
+  }
   if (!patternIndex) {
     patternIndex = {};
     const add = (ex) => { if (ex && ex.id && ex.pattern && !patternIndex[ex.id]) patternIndex[ex.id] = ex.pattern; };
@@ -203,6 +249,19 @@ export function exercisePattern(exId) {
   // Ids derivados (p. ej. «d4c2p»): probar quitando sufijos.
   for (let id = exId; id && id.length > 2; id = id.slice(0, -1)) if (patternIndex[id]) return patternIndex[id];
   return null;
+}
+
+/** Indica si hay al menos una serie válida registrada hoy en el entreno libre (`setLog[date].free`). */
+export function hasFreeWorkout(setLog, dateKey) {
+  const free = setLog && dateKey ? setLog[dateKey]?.free : null;
+  if (!free || typeof free !== "object") return false;
+  for (const series of Object.values(free)) {
+    if (!Array.isArray(series)) continue;
+    if (series.some((s) => s && (isNum(s.reps) ? s.reps > 0 : Boolean(String(s.reps || "").trim())))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 const RECOVERY_HOURS = 72;     // un grupo «cargado al máximo» vuelve a 100 % en ~72 h
@@ -227,25 +286,34 @@ const firstInt = (txt, fallback) => {
  * tipo «run» en días sin sesión de Shift cuentan como trote (patrón run).
  * @returns {Array<{ day: string, exId: string|null, pattern: string, sets: number, reps: number }>}
  */
-function workEntries(setLog, { log = null, workouts = null } = {}) {
+function workEntries(setLog, { log = null, workouts = null, customExercises = null } = {}) {
   const out = [];
   for (const [day, routines] of Object.entries(setLog || {})) {
     for (const exs of Object.values(routines || {})) {
       for (const [exId, series] of Object.entries(exs || {})) {
         const ok = (Array.isArray(series) ? series : []).filter((x) => x && isNum(x.reps) && x.reps > 0);
         if (!ok.length) continue;
-        out.push({ day, exId, pattern: exercisePattern(exId), sets: ok.length, reps: ok.reduce((a, x) => a + x.reps, 0) });
+        const custom = findCustomExercise(exId, customExercises);
+        const muscles = custom ? customExerciseMuscles(custom) : null;
+        out.push({
+          day,
+          exId,
+          pattern: exercisePattern(exId, customExercises),
+          muscles,
+          sets: ok.length,
+          reps: ok.reduce((a, x) => a + x.reps, 0),
+        });
       }
     }
   }
   for (const [day, entry] of Object.entries(log || {})) {
     const rid = entry && entry.r;
-    if (!rid || (setLog?.[day]?.[rid] && Object.keys(setLog[day][rid]).length)) continue;
+    if (!rid || rid === "free" || (setLog?.[day]?.[rid] && Object.keys(setLog[day][rid]).length)) continue;
     const routine = routineById(rid, 1, entry.v);
     for (const ex of routine?.exercises || []) {
       if (!ex.pattern) continue;
       const sets = ex.sets || 0;
-      out.push({ day, exId: ex.id, pattern: ex.pattern, sets, reps: sets * firstInt(ex.reps, 10), planned: true });
+      out.push({ day, exId: ex.id, pattern: ex.pattern, muscles: null, sets, reps: sets * firstInt(ex.reps, 10), planned: true });
     }
   }
   for (const w of Array.isArray(workouts) ? workouts : []) {
@@ -253,7 +321,7 @@ function workEntries(setLog, { log = null, workouts = null } = {}) {
     const day = dkey(new Date(w.start));
     if (log?.[day]?.r) continue;
     const sets = Math.max(1, Math.round(w.min / 10));
-    out.push({ day, exId: null, pattern: "run", sets, reps: sets * 10 });
+    out.push({ day, exId: null, pattern: "run", muscles: null, sets, reps: sets * 10 });
   }
   return out;
 }
@@ -263,22 +331,22 @@ function workEntries(setLog, { log = null, workouts = null } = {}) {
  * y carga (repeticiones ponderadas) de los últimos `days` días.
  * @param {object} setLog  fecha → rutina → ejercicio → series
  * @param {string} dateKey
- * @param {{ log?: object, workouts?: Array, now?: Date, sessionHour?: number, days?: number }} [opts]
+ * @param {{ log?: object, workouts?: Array, customExercises?: Array|object, now?: Date, sessionHour?: number, days?: number }} [opts]
  * @returns {{ groups: Array<{ group, label, pct, status, sets, reps, lastDate, trained }>,
  *            counts: { recovered: number, fatigued: number, depleted: number } }}
  */
-export function muscleGroups(setLog, dateKey, { log = null, workouts = null, now = null, sessionHour = 7, days = 7 } = {}) {
+export function muscleGroups(setLog, dateKey, { log = null, workouts = null, customExercises = null, now = null, sessionHour = 7, days = 7 } = {}) {
   const ref = now instanceof Date ? now : new Date(fromKey(dateKey).getTime() + 23.99 * 3600e3);
   const fatigue = {};
   const last = {};
   const sets = {};
   const reps = {};
-  for (const e of workEntries(setLog, { log, workouts })) {
+  for (const e of workEntries(setLog, { log, workouts, customExercises })) {
     const hoursAgo = (ref - (fromKey(e.day).getTime() + sessionHour * 3600e3)) / 3600e3;
     if (hoursAgo < 0) continue;
     const decay = Math.max(0, 1 - hoursAgo / RECOVERY_HOURS);
     const inWindow = hoursAgo <= days * 24;
-    for (const [g, w] of Object.entries(PATTERN_MUSCLES[e.pattern] || {})) {
+    for (const [g, w] of Object.entries(e.muscles || PATTERN_MUSCLES[e.pattern] || {})) {
       fatigue[g] = (fatigue[g] || 0) + (e.sets * w * decay) / SETS_TO_FULL_FATIGUE;
       if (inWindow) {
         sets[g] = (sets[g] || 0) + e.sets * w;
@@ -334,7 +402,7 @@ const RECOMMENDABLE = ["d1", "d2", "d3", "d4"];
  * @returns {{ rid: string|null, kind: "train"|"low"|"done", readiness: number|null, reason: string,
  *            fresh: Array, tired: Array, ranking: Array<{ rid, readiness, score }> }}
  */
-export function recommendTraining({ groups, recovery = null, plannedRid = null, doneToday = null, weekDone = [], routineVariants = {} }) {
+export function recommendTraining({ groups, recovery = null, plannedRid = null, doneToday = null, weekDone = [], routineVariants = {}, setLog = null, today = null }) {
   const byGroup = Object.fromEntries((groups || []).map((g) => [g.group, g]));
   const ranking = RECOMMENDABLE.map((rid) => {
     const weights = routineMuscles(rid, routineVariants?.[rid]);
@@ -347,7 +415,8 @@ export function recommendTraining({ groups, recovery = null, plannedRid = null, 
   }).sort((a, b) => b.score - a.score);
 
   const tired = (groups || []).filter((g) => g.status !== "recovered").sort((a, b) => a.pct - b.pct);
-  if (doneToday) {
+  const didToday = doneToday || (setLog && today && hasFreeWorkout(setLog, today) ? "free" : null);
+  if (didToday) {
     return { rid: null, kind: "done", readiness: null, reason: "Ya entrenaste hoy: deja que los músculos recuperen.", fresh: [], tired, ranking };
   }
   const top = ranking[0];

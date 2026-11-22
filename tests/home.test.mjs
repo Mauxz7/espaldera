@@ -29,6 +29,15 @@ test("weekProgress tolera datos vacíos", () => {
   assert.deepEqual([p.sessions.value, p.habits.value, p.habits.goal, p.minutes.value], [0, 0, 1, 0]);
 });
 
+test("weekProgress cuenta días con entreno libre sin duplicar si ya hay rutina principal", () => {
+  const setLog = {
+    [keys[1]]: { free: { lib_trx_curl: [{ reps: 12, load: "10 kg" }] } }, // martes: solo libre
+    [keys[0]]: { free: { lib_trx_curl: [{ reps: 10, load: "10 kg" }] } }, // lunes: ya tiene d1
+  };
+  const p = weekProgress({ keys, todayIdx: 2, fixed: { 0: "d1" }, habits: {}, habitDefs: defs, workouts: [], setLog });
+  assert.equal(p.sessions.value, 2);
+});
+
 test("todayPlan prioriza lo registrado, luego Fitbit, luego el plan", () => {
   assert.deepEqual(todayPlan({ info: { rid: "d2" }, logged: { r: "d4" } }), { state: "done", rid: "d4" });
   assert.deepEqual(todayPlan({ info: { rid: "d2" }, fromFitbit: "d1" }), { state: "fitbit", rid: "d1" });

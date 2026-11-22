@@ -11,6 +11,7 @@ export function SheetDialog({
   title,
   subtitle,
   headerExtra,
+  footer = null,
   onClose,
   children,
 }) {
@@ -86,6 +87,11 @@ export function SheetDialog({
         <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
           {children}
         </div>
+        {footer && (
+          <div className="mt-3 shrink-0 border-t border-line pt-3">
+            {footer}
+          </div>
+        )}
       </div>
     </dialog>
   );

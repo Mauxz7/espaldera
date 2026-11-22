@@ -147,3 +147,22 @@ test("weekVotes suma 1 voto por día con dopamina buena (no por toque) e ignora 
   assert.equal(byId.descanso.votes, 0);
   assert.equal(byId.atleta.votes, 0);
 });
+
+test("weekVotes cuenta entreno libre como voto de Atleta sin contar doble", () => {
+  const setLog = {
+    [keys[0]]: { free: { lib_trx_curl: [{ reps: 12, load: "10 kg" }] } },
+    [keys[1]]: { free: { lib_trx_curl: [{ reps: 10, load: "10 kg" }] } },
+  };
+  const rows = weekVotes({
+    keys,
+    todayIdx: 2,
+    habits: {},
+    habitDefs: [],
+    identities: ids,
+    log: { [keys[0]]: { r: "d1" } },
+    setLog,
+  });
+  const atleta = rows.find((r) => r.id === "atleta");
+  assert.equal(atleta.votes, 2);
+  assert.equal(atleta.days, 2);
+});

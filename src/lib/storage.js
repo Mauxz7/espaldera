@@ -6,7 +6,7 @@ export const LS = {
   del(k) { try { localStorage.removeItem("fitpanel:" + k); } catch (e) {} },
 };
 
-export const SYNC_KEYS = ["sets", "log", "habits", "health", "block", "swaps", "loads", "lastLoads", "weekPlan", "habitDefs", "setLog", "runLevel", "workouts", "calBusy", "identities", "dopamineDefs", "dopamine", "sleep", "wins", "reviews", "routineVariants", "skips", "vitals", "healthPrefs"];
+export const SYNC_KEYS = ["sets", "log", "habits", "health", "block", "swaps", "loads", "lastLoads", "weekPlan", "habitDefs", "setLog", "runLevel", "workouts", "calBusy", "identities", "dopamineDefs", "dopamine", "sleep", "wins", "reviews", "routineVariants", "skips", "vitals", "healthPrefs", "customExercises", "freeSessions"];
 
 export const DEFAULT_REPO = "Mauxz7/espaldera-data";
 

@@ -1,17 +1,23 @@
 // Cálculos de la pestaña Inicio (sin interfaz, con pruebas en tests/home.test.mjs).
 import { MAIN } from "./planner.js";
+import { hasFreeWorkout } from "./metrics.js";
 import { DEFAULT_HABIT_DEFS, reqDone } from "../data/habits.js";
 import { dkey } from "./dates.js";
 import { isPoorSleep, fmtSleep } from "./sleep.js";
 
 // Progreso de la semana en curso (lunes a hoy) para los tres anillos de Inicio.
-// - sesiones: rutinas principales distintas hechas (en Shift o cubiertas por Fitbit) de 4.
+// - sesiones: rutinas principales distintas hechas (en Shift o cubiertas por Fitbit) de 4 + días con entreno libre sin rutina principal.
 // - hábitos: días con todos los obligatorios cumplidos, sobre los días transcurridos.
 // - minutos: minutos de entrenos de Fitbit en la semana, contra una meta de 150 (recomendación OMS).
 export const MINUTES_GOAL = 150;
 
-export function weekProgress({ keys, todayIdx, fixed, habits, habitDefs, workouts }) {
+export function weekProgress({ keys, todayIdx, fixed, habits, habitDefs, workouts, setLog = null }) {
   const done = new Set(Object.values(fixed || {}).filter((r) => MAIN.includes(r)));
+  const limit = Math.min((keys || []).length - 1, Number.isFinite(todayIdx) ? todayIdx : (keys || []).length - 1);
+  let freeDays = 0;
+  for (let i = 0; i <= limit; i++) {
+    if (!MAIN.includes(fixed?.[i]) && hasFreeWorkout(setLog, keys[i])) freeDays++;
+  }
   const defs = (habitDefs || DEFAULT_HABIT_DEFS).filter((d) => !d.archived && (!d.group || d.group === "req"));
   const days = Math.max(1, Math.min(7, todayIdx + 1));
   let habitDays = 0;
@@ -28,7 +34,7 @@ export function weekProgress({ keys, todayIdx, fixed, habits, habitDefs, workout
     if (i >= 0 && i <= todayIdx && Number(w.min) > 0) minutes += Math.round(Number(w.min));
   }
   return {
-    sessions: { value: done.size, goal: MAIN.length },
+    sessions: { value: done.size + freeDays, goal: MAIN.length },
     habits: { value: habitDays, goal: days },
     minutes: { value: minutes, goal: MINUTES_GOAL },
   };

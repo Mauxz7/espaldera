@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { rankPlans, scorePlan, MAIN } from "../src/lib/planner.js";
+import { rankPlans, scorePlan, MAIN, computeStreak } from "../src/lib/planner.js";
 
 const OFFICE = [true, false, true, true, true, false, false]; // Lun…Dom
 const NONE = Array(7).fill(false);
@@ -277,4 +277,19 @@ test("Bevel acepta el historial completo { byDate, today }, domingo sin huecos y
   assert.equal(wsHigh.bevelAdjustment.originalCode, "d1");
   assert.equal(wsHigh.bevelAdjustment.recommendedCode, "d2");
   wsHigh.arr.forEach((r, i) => assert.ok(!(r === "d3" && wsHigh.arr[i - 1] === "d2"), wsHigh.arr.join()));
+});
+
+test("computeStreak incluye días con entreno libre en setLog", () => {
+  const now = new Date();
+  const fmt = (daysAgo) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - daysAgo);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dd}`;
+  };
+  const log = { [fmt(4)]: { r: "d1" } };
+  const setLog = { [fmt(1)]: { free: { lib_trx_curl: [{ reps: 12, load: "10 kg" }] } } };
+  assert.equal(computeStreak(log, setLog), 2);
 });

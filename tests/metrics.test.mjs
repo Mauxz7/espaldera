@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { trendCard, seriesOf, dailyStress, stressLevel, loadStatus, trainingLoad, muscleFreshness, muscleGroups, routineMuscles, recommendTraining, exercisePattern, cardioFocus } from "../src/lib/metrics.js";
+import { trendCard, seriesOf, dailyStress, stressLevel, loadStatus, trainingLoad, muscleFreshness, muscleGroups, routineMuscles, recommendTraining, exercisePattern, cardioFocus, hasFreeWorkout } from "../src/lib/metrics.js";
 import { dkey, fromKey, addDays } from "../src/lib/dates.js";
 
 const day = (base, n) => dkey(addDays(fromKey(base), n));
@@ -122,4 +122,51 @@ test("recommendTraining: evita lo fatigado, sesión suave con recuperación baja
   // Ya hiciste torso esta semana → baja en el ranking.
   const fresh = muscleGroups({}, D).groups;
   assert.notEqual(recommendTraining({ groups: fresh, weekDone: ["d1", "d1"] }).rid, "d1");
+});
+
+test("entreno libre: muscleGroups baja con solo setLog.free, exercisePattern resuelve cus_* y recommendTraining da done", () => {
+  const freeOnly = {
+    [D]: {
+      free: {
+        lib_trx_curl: [
+          { reps: 12, load: "10 kg" },
+          { reps: 12, load: "10 kg" },
+          { reps: 10, load: "10 kg" },
+          { reps: 10, load: "10 kg" },
+        ],
+      },
+    },
+  };
+  assert.equal(hasFreeWorkout(freeOnly, D), true);
+  assert.equal(hasFreeWorkout({ [D]: { free: { lib_trx_curl: [{ reps: 0, load: "" }] } } }, D), false);
+
+  const resFree = muscleGroups(freeOnly, D);
+  const biceps = resFree.groups.find((g) => g.group === "biceps");
+  assert.ok(biceps.pct < 100);
+  assert.equal(biceps.sets, 4);
+  assert.equal(biceps.trained, true);
+  assert.equal(resFree.groups.find((g) => g.group === "quads").pct, 100);
+
+  // exercisePattern y muscleGroups resuelven ejercicios personalizados cus_*
+  const customList = [
+    { id: "cus_1700000001", name: "Curl concentrado", primaryGroup: "biceps", secondaryGroups: [] },
+  ];
+  assert.equal(exercisePattern("cus_1700000001", customList), "arms");
+  assert.equal(exercisePattern("cus_1700000001", { cus_1700000001: customList[0] }), "arms");
+
+  const customSetLog = {
+    [D]: {
+      free: {
+        cus_1700000001: Array(4).fill({ reps: 12, load: "10 kg" }),
+      },
+    },
+  };
+  const resCus = muscleGroups(customSetLog, D, { customExercises: customList });
+  assert.ok(resCus.groups.find((g) => g.group === "biceps").pct < 100);
+  assert.equal(resCus.groups.find((g) => g.group === "triceps").pct, 100);
+
+  // recommendTraining da kind: "done" con un entreno libre hoy
+  assert.equal(recommendTraining({ groups: resFree.groups, doneToday: "free" }).kind, "done");
+  assert.equal(recommendTraining({ groups: resFree.groups, setLog: freeOnly, today: D }).kind, "done");
+  assert.notEqual(recommendTraining({ groups: resFree.groups, setLog: { [D]: { free: {} } }, today: D }).kind, "done");
 });
