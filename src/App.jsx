@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Dumbbell, Activity, Sunrise, Settings, LayoutDashboard } from "lucide-react";
 import { Sync, usePersisted } from "./lib/storage.js";
 import { dkey, addDays, pruneDays } from "./lib/dates.js";
 import { CREATINE_ID, DEFAULT_HABIT_DEFS } from "./data/habits.js";
 import { useWeekPlan } from "./lib/planner.js";
+import { DEFAULT_HEALTH_PREFS, computeBevelHistory } from "./lib/bevel.js";
 import { useCalendarSync } from "./lib/calendar.js";
 import { unlockAudio } from "./lib/audio.js";
 import { SyncBadge } from "./components/ui.jsx";
@@ -37,9 +38,11 @@ export default function App() {
   });
   const [trainRid, setTrainRid] = useState(null);
   const goTrain = useCallback((rid) => { setTrainRid(rid || null); setTab("train"); window.scrollTo(0, 0); }, []);
+  const goHealth = useCallback(() => { setTab("fitbit"); window.scrollTo(0, 0); }, []);
   const openReview = useCallback(() => { setTab("review"); window.scrollTo(0, 0); }, []);
   const goHome = useCallback(() => { setTab("home"); window.scrollTo(0, 0); }, []);
   const [sets, setSets] = usePersisted("sets", {});
+  const [seriesLog, setSeriesLog] = usePersisted("setLog", {});
   const [log, setLog] = usePersisted("log", {});
   const [habits, setHabits] = usePersisted("habits", {});
   const [habitDefs, setHabitDefs] = usePersisted("habitDefs", DEFAULT_HABIT_DEFS);
@@ -52,7 +55,16 @@ export default function App() {
   const [reviews, setReviews] = usePersisted("reviews", {});
   const [routineVariants, setRoutineVariants] = usePersisted("routineVariants", {});
   const [skips, setSkips] = usePersisted("skips", {});
-  const wp = useWeekPlan(log);
+  const [sleep] = usePersisted("sleep", {}); // de Fitbit; solo lectura
+  const [workouts] = usePersisted("workouts", []); // de Fitbit; solo lectura
+  const [vitals] = usePersisted("vitals", {}); // de Fitbit; solo lectura
+  const [healthPrefs, setHealthPrefs] = usePersisted("healthPrefs", DEFAULT_HEALTH_PREFS);
+  const today = dkey();
+  const bevelHistory = useMemo(
+    () => computeBevelHistory({ sleep, workouts, vitals, setLog: seriesLog, sets, loads, log, block, healthPrefs, today }),
+    [sleep, workouts, vitals, seriesLog, sets, loads, log, block, healthPrefs, today],
+  );
+  const wp = useWeekPlan(log, { bevel: bevelHistory });
   useCalendarSync(wp.upcoming, routineVariants); // plan → cal/plan.json → calendario «Shift» (repo privado)
   const [timer, setTimer] = useState(null);
   const [warmup, setWarmup] = useState(false);
@@ -102,7 +114,6 @@ export default function App() {
     return () => { document.removeEventListener("visibilitychange", onVis); clearInterval(id); };
   }, []);
 
-  const today = dkey();
   const rem = useHabitReminders(habitDefs, habits[today] || {});
   const completeHabit = useCallback((id = CREATINE_ID) => {
     const defs = habitDefs || DEFAULT_HABIT_DEFS;
@@ -135,11 +146,11 @@ export default function App() {
           <SyncBadge />
         </header>
         <div className="mx-auto max-w-6xl">
-          {tab === "home" && <HomeView wp={wp} log={log} habits={habits} setHabits={setHabits} habitDefs={habitDefs} block={block} setBlock={setBlock} goTrain={goTrain} wins={wins} setWins={setWins} reviews={reviews} openReview={openReview} routineVariants={routineVariants} />}
+          {tab === "home" && <HomeView wp={wp} log={log} habits={habits} setHabits={setHabits} habitDefs={habitDefs} block={block} setBlock={setBlock} goTrain={goTrain} goHealth={goHealth} wins={wins} setWins={setWins} reviews={reviews} openReview={openReview} routineVariants={routineVariants} bevelHistory={bevelHistory} />}
           {tab === "review" && <ReviewView wp={wp} log={log} habits={habits} habitDefs={habitDefs} wins={wins} setWins={setWins} reviews={reviews} setReviews={setReviews} onBack={goHome} />}
-          {tab === "train" && <TrainView key={trainRid || "auto"} initialRid={trainRid} sets={sets} setSets={setSets} log={log} setLog={setLog} block={block} swaps={swaps} setSwaps={setSwaps} loads={loads} setLoads={setLoads} lastLoads={lastLoads} setLastLoads={setLastLoads} routineVariants={routineVariants} setRoutineVariants={setRoutineVariants} skips={skips} setSkips={setSkips} startTimer={startTimer} openWarmup={() => setWarmup(true)} wp={wp} />}
-          {tab === "fitbit" && <DashboardView health={health} setHealth={setHealth} log={log} />}
-          {tab === "settings" && <SettingsView habitDefs={habitDefs} setHabitDefs={setHabitDefs} reminderCard={<ReminderCard rem={rem} />} />}
+          {tab === "train" && <TrainView key={trainRid || "auto"} initialRid={trainRid} sets={sets} setSets={setSets} seriesLog={seriesLog} setSeriesLog={setSeriesLog} log={log} setLog={setLog} block={block} swaps={swaps} setSwaps={setSwaps} loads={loads} setLoads={setLoads} lastLoads={lastLoads} setLastLoads={setLastLoads} routineVariants={routineVariants} setRoutineVariants={setRoutineVariants} skips={skips} setSkips={setSkips} startTimer={startTimer} openWarmup={() => setWarmup(true)} wp={wp} />}
+          {tab === "fitbit" && <DashboardView health={health} setHealth={setHealth} log={log} bevelHistory={bevelHistory} vitals={vitals} />}
+          {tab === "settings" && <SettingsView habitDefs={habitDefs} setHabitDefs={setHabitDefs} reminderCard={<ReminderCard rem={rem} />} healthPrefs={healthPrefs} setHealthPrefs={setHealthPrefs} />}
           {tab === "habits" && <HabitsView habits={habits} setHabits={setHabits} habitDefs={habitDefs} tomorrow={wp.info(dkey(addDays(new Date(), 1)))} tonight={wp.info(dkey())} routineVariants={routineVariants} />}
         </div>
       </main>

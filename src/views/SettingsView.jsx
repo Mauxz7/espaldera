@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Cloud,
   RefreshCw,
@@ -13,6 +13,8 @@ import {
   ChevronDown,
   ChevronUp,
   Bell,
+  HeartPulse,
+  RotateCcw,
 } from "lucide-react";
 import { DEFAULT_REPO, Sync, useSyncStatus, usePersisted } from "../lib/storage.js";
 import { hhmm } from "../lib/dates.js";
@@ -20,6 +22,7 @@ import { DEFAULT_HABIT_DEFS, getHabitIcon } from "../data/habits.js";
 import { DEFAULT_IDENTITIES, habitIdentity } from "../data/identities.js";
 import { DEFAULT_DOPAMINE_DEFS } from "../data/dopamine.js";
 import { normalizeIdentities } from "../lib/identity.js";
+import { DEFAULT_HEALTH_PREFS, normalizeHealthPrefs } from "../lib/bevel.js";
 import { IdentityEditor } from "../components/IdentityEditor.jsx";
 import { DopamineEditor } from "../components/DopamineEditor.jsx";
 import { PushCard } from "../components/PushCard.jsx";
@@ -33,7 +36,187 @@ export const SYNC_ERRORS = {
   red: "Sin conexión. Tus cambios quedan guardados aquí y se envían al volver la red.",
 };
 
-export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
+function HealthPrefsCard({ healthPrefs, setHealthPrefs }) {
+  const norm = normalizeHealthPrefs(healthPrefs);
+  const [sleepH, setSleepH] = useState(String(Math.floor(norm.sleepBaseMin / 60)));
+  const [sleepM, setSleepM] = useState(String(norm.sleepBaseMin % 60));
+  const [age, setAge] = useState(norm.age != null ? String(norm.age) : "");
+  const [maxHr, setMaxHr] = useState(norm.maxHr != null ? String(norm.maxHr) : "");
+
+  useEffect(() => {
+    const n = normalizeHealthPrefs(healthPrefs);
+    setSleepH(String(Math.floor(n.sleepBaseMin / 60)));
+    setSleepM(String(n.sleepBaseMin % 60));
+    setAge(n.age != null ? String(n.age) : "");
+    setMaxHr(n.maxHr != null ? String(n.maxHr) : "");
+  }, [healthPrefs]);
+
+  const commit = (patch) => {
+    if (!setHealthPrefs) return;
+    const next = normalizeHealthPrefs({
+      sleepBaseMin: norm.sleepBaseMin,
+      age: norm.age,
+      maxHr: norm.maxHr,
+      hrvKind: norm.hrvKind,
+      ...patch,
+    });
+    setHealthPrefs({
+      sleepBaseMin: next.sleepBaseMin,
+      age: next.age,
+      maxHr: next.maxHr,
+      hrvKind: next.hrvKind,
+    });
+  };
+
+  const onSleepChange = (nextH, nextM) => {
+    setSleepH(nextH);
+    setSleepM(nextM);
+    const h = parseInt(nextH, 10);
+    const m = nextM === "" ? 0 : parseInt(nextM, 10);
+    if (!Number.isFinite(h) || !Number.isFinite(m) || m < 0 || m > 59) return;
+    const total = Math.max(240, Math.min(720, h * 60 + m));
+    commit({ sleepBaseMin: total });
+  };
+
+  const onAgeChange = (val) => {
+    setAge(val);
+    if (val.trim() === "") {
+      commit({ age: null });
+      return;
+    }
+    const n = parseInt(val, 10);
+    if (Number.isFinite(n) && n >= 10 && n <= 110) commit({ age: n });
+  };
+
+  const onMaxHrChange = (val) => {
+    setMaxHr(val);
+    if (val.trim() === "") {
+      commit({ maxHr: null });
+      return;
+    }
+    const n = parseInt(val, 10);
+    if (Number.isFinite(n) && n >= 120 && n <= 230) commit({ maxHr: n });
+  };
+
+  const resetDefaults = () => {
+    if (!setHealthPrefs) return;
+    setHealthPrefs({ ...DEFAULT_HEALTH_PREFS });
+  };
+
+  const isDefault = norm.sleepBaseMin === DEFAULT_HEALTH_PREFS.sleepBaseMin
+    && norm.age === DEFAULT_HEALTH_PREFS.age
+    && norm.maxHr === DEFAULT_HEALTH_PREFS.maxHr;
+
+  const maxHrSource = norm.maxHr != null
+    ? "manual"
+    : norm.age != null
+      ? "208 − 0.7 × edad"
+      : "valor por defecto";
+
+  const inputCls = "mt-1 w-full min-w-0 rounded-lg border border-line bg-surface2 px-3 py-2 font-mono text-sm tabular-nums text-fg placeholder:text-muted/60 focus:border-accent focus:outline-none";
+
+  return (
+    <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <HeartPulse size={16} className="text-accent" />
+            <h2 className="font-display text-lg font-semibold uppercase tracking-wide">Metas de salud (Bevel)</h2>
+          </div>
+          <p className="mt-0.5 text-sm text-muted">
+            Ajusta tu sueño base y tu FC máxima para calibrar Sleep Need y Strain. Los cambios se guardan al instante.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={resetDefaults}
+          disabled={isDefault}
+          className="inline-flex items-center gap-1 rounded-xl border border-line bg-surface2 px-2.5 py-1.5 text-xs font-medium text-muted hover:text-fg disabled:opacity-40"
+        >
+          <RotateCcw size={13} />Restablecer
+        </button>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="min-w-0">
+          <span className="block text-xs text-muted">Sueño base diario</span>
+          <div className="grid grid-cols-2 gap-1.5">
+            <label className="min-w-0">
+              <span className="sr-only">Horas de sueño base</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="4"
+                max="12"
+                value={sleepH}
+                onChange={(e) => onSleepChange(e.target.value, sleepM)}
+                placeholder="7"
+                aria-label="Horas de sueño base"
+                className={inputCls}
+              />
+              <span className="mt-0.5 block text-[10px] text-muted">horas</span>
+            </label>
+            <label className="min-w-0">
+              <span className="sr-only">Minutos de sueño base</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                max="59"
+                step="5"
+                value={sleepM}
+                onChange={(e) => onSleepChange(sleepH, e.target.value)}
+                placeholder="30"
+                aria-label="Minutos de sueño base"
+                className={inputCls}
+              />
+              <span className="mt-0.5 block text-[10px] text-muted">min</span>
+            </label>
+          </div>
+        </div>
+
+        <label className="block min-w-0 text-xs text-muted">
+          Edad (opcional)
+          <input
+            type="number"
+            inputMode="numeric"
+            min="10"
+            max="110"
+            value={age}
+            onChange={(e) => onAgeChange(e.target.value)}
+            placeholder="ej. 30"
+            className={inputCls}
+          />
+          <span className="mt-0.5 block text-[10px] text-muted">Para estimar FC máx.</span>
+        </label>
+
+        <label className="block min-w-0 text-xs text-muted">
+          FC máxima manual (opcional)
+          <input
+            type="number"
+            inputMode="numeric"
+            min="120"
+            max="230"
+            value={maxHr}
+            onChange={(e) => onMaxHrChange(e.target.value)}
+            placeholder="ej. 188"
+            className={inputCls}
+          />
+          <span className="mt-0.5 block text-[10px] text-muted">lpm (120–230)</span>
+        </label>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface2/60 px-3 py-2 text-xs">
+        <span className="text-muted">FC máx. efectiva</span>
+        <span className="font-mono font-semibold tabular-nums text-fg">
+          {norm.effectiveMaxHr} lpm <span className="font-sans font-normal text-muted">({maxHrSource})</span>
+        </span>
+      </div>
+    </section>
+  );
+}
+
+export function SettingsView({ habitDefs, setHabitDefs, reminderCard, healthPrefs, setHealthPrefs }) {
   const st = useSyncStatus();
   const cfg = Sync.cfg();
   const [token, setToken] = useState("");
@@ -544,6 +727,8 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard }) {
       <IdentityEditor identities={identities} setIdentities={setIdentities} />
 
       <DopamineEditor defs={dopamineDefs} setDefs={setDopamineDefs} identities={idList} />
+
+      <HealthPrefsCard healthPrefs={healthPrefs} setHealthPrefs={setHealthPrefs} />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">

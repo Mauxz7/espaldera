@@ -1,13 +1,15 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ResponsiveContainer, ComposedChart, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from "recharts";
-import { Dumbbell, Activity, Bike, X, Zap, Trophy, Footprints, ClipboardPaste, Save, Trash2, Moon, Flame, TrendingUp, TrendingDown, CalendarDays } from "lucide-react";
+import { Dumbbell, Activity, Bike, X, Zap, Trophy, Footprints, ClipboardPaste, Save, Trash2, Moon, Flame, TrendingUp, TrendingDown, CalendarDays, HeartPulse } from "lucide-react";
 import { pad, dkey, fromKey, addDays, mondayOf, DAYS, DAYS_LONG, fmtShort, fmtInt, fmtSleep, hhmm } from "../lib/dates.js";
-import { GH_SEED, SAMPLE_EMAIL, parseHealth, deriveWeek, fmtRange } from "../lib/health.js";
+import { GH_SEED, SAMPLE_EMAIL, parseHealth, deriveWeek, fmtRange, hideHealthWeek, findWorkoutStrain } from "../lib/health.js";
 import { computeStreak } from "../lib/planner.js";
 import { usePersisted } from "../lib/storage.js";
 import { routineById } from "../data/program.js";
 import { WORKOUT_KINDS, KIND_LABELS, validWorkouts, lastWeeks } from "../lib/workouts.js";
 import { Chip } from "../components/ui.jsx";
+import { HealthRings } from "../components/HealthRings.jsx";
+import { HealthSheets } from "../components/HealthSheets.jsx";
 
 const KIND_ICON = {
   run: Flame,
@@ -205,7 +207,7 @@ export function ImportPanel({ onSave, onClose, initial }) {
   );
 }
 
-export function WorkoutsSection({ workouts, log }) {
+export function WorkoutsSection({ workouts, log, bevelHistory }) {
   const list = useMemo(() => validWorkouts(workouts), [workouts]);
   const weekly = useMemo(() => lastWeeks(list, 8), [list]);
   const recent = useMemo(() => list.slice(0, 10), [list]);
@@ -256,8 +258,11 @@ export function WorkoutsSection({ workouts, log }) {
             {recent.map((w) => {
               const Icon = KIND_ICON[w.kind] || Activity;
               const logged = log && log[w.date] && log[w.date].r ? routineById(log[w.date].r, undefined, log[w.date].v) : null;
+              const bevelW = findWorkoutStrain(bevelHistory, w);
+              const avgHr = w.avgHr ?? bevelW?.avgHr ?? null;
+              const strainPct = bevelW && typeof bevelW.strainPct === "number" ? bevelW.strainPct : null;
               return (
-                <li key={w.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                <li key={w.id} className="flex items-center justify-between gap-2 py-2 text-sm">
                   <div className="flex min-w-0 items-center gap-2.5">
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-surface2 text-accent">
                       <Icon size={16} />
@@ -268,14 +273,22 @@ export function WorkoutsSection({ workouts, log }) {
                         <span className="text-xs text-muted">· {KIND_LABELS[w.kind]}</span>
                         {logged && <Chip tone="accent">{logged.short}</Chip>}
                       </div>
-                      <div className="font-mono text-xs text-muted">
-                        {fmtShort(w.date)} · {hhmm(new Date(w.start))}
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-xs text-muted">
+                        <span>{fmtShort(w.date)} · {hhmm(new Date(w.start))}</span>
+                        {avgHr != null && (
+                          <span className="inline-flex items-center gap-0.5 text-fg/80">
+                            <HeartPulse size={11} className="text-warn" />{avgHr} lpm
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
-                  <span className="shrink-0 font-mono text-xs text-fg tabular-nums">
-                    {w.min != null ? `${fmtInt(w.min)} min` : "—"}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className="font-mono text-xs text-fg tabular-nums">
+                      {w.min != null ? `${fmtInt(w.min)} min` : "—"}
+                    </span>
+                    {strainPct != null && <Chip tone="accent">Strain {strainPct}%</Chip>}
+                  </div>
                 </li>
               );
             })}
@@ -286,12 +299,49 @@ export function WorkoutsSection({ workouts, log }) {
   );
 }
 
-export function DashboardView({ health, setHealth, log }) {
+export function DashboardView({ health, setHealth, log, bevelHistory, vitals }) {
   const [workouts] = usePersisted("workouts", []);
+  const [subTab, setSubTab] = useState("daily"); // "daily" | "weekly"
+  const [activeSheet, setActiveSheet] = useState(null); // null | "recovery" | "sleep" | "strain"
   const [showImport, setShowImport] = useState(false);
   const [editing, setEditing] = useState(null);
   const [confirmDel, setConfirmDel] = useState(null);
   const [sel, setSel] = useState(null);
+
+  const todayKey = dkey();
+  const navDates = useMemo(() => {
+    const all = bevelHistory && Array.isArray(bevelHistory.dates) && bevelHistory.dates.length
+      ? bevelHistory.dates
+      : [todayKey];
+    return all.slice(-30);
+  }, [bevelHistory, todayKey]);
+
+  const defaultDate = (bevelHistory && (bevelHistory.today?.date || bevelHistory.latestDate)) || navDates[navDates.length - 1] || todayKey;
+  const [selectedDate, setSelectedDate] = useState(defaultDate);
+
+  useEffect(() => {
+    if (!navDates.includes(selectedDate)) {
+      setSelectedDate(defaultDate);
+    }
+  }, [navDates, selectedDate, defaultDate]);
+
+  const dateIdx = Math.max(0, navDates.indexOf(selectedDate));
+  const canPrevDate = dateIdx > 0;
+  const canNextDate = dateIdx < navDates.length - 1;
+  const goPrevDate = () => { if (canPrevDate) setSelectedDate(navDates[dateIdx - 1]); };
+  const goNextDate = () => { if (canNextDate) setSelectedDate(navDates[dateIdx + 1]); };
+  const goTodayDate = () => setSelectedDate(defaultDate);
+
+  const activeDay = (bevelHistory && bevelHistory.byDate && bevelHistory.byDate[selectedDate]) || bevelHistory?.today || null;
+
+  const handleSubTabKeyDown = (e) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+    e.preventDefault();
+    const next = subTab === "daily" ? "weekly" : "daily";
+    setSubTab(next);
+    const btn = e.currentTarget.querySelector(`[data-health-tab="${next}"]`);
+    if (btn) btn.focus();
+  };
 
   // Historial = semanas reales de Gmail + lo que importes; lo guardado gana si coincide la fecha. "hidden" oculta una semana.
   const weeks = useMemo(() => {
@@ -322,156 +372,234 @@ export function DashboardView({ health, setHealth, log }) {
     setShowImport(false); setEditing(null); setSel(null);
   };
 
-  if (!cur) {
-    return (
-      <div className="space-y-5">
-        <div className="rounded-2xl border border-line bg-surface p-6 text-center">
-          <p className="text-sm text-muted">No hay semanas en el historial.</p>
-          <button onClick={() => setShowImport(true)} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accentInk"><ClipboardPaste size={16} />Importar correo</button>
-          {showImport && <ImportPanel onSave={saveWeek} onClose={() => setShowImport(false)} />}
-        </div>
-        <WorkoutsSection workouts={workouts} log={log} />
-      </div>
-    );
-  }
+  const hideWeek = (weekStart) => {
+    setHealth((list) => hideHealthWeek(list, weekStart));
+    setConfirmDel(null);
+    setSel(null);
+  };
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">Google Health · {weeks.length} semanas</div>
-          <h1 className="font-display text-3xl font-semibold uppercase leading-none md:text-4xl">Actividad & progreso</h1>
-          <p className="mt-1 text-sm text-muted">Semana {fmtRange(cur)} <span className="text-muted/70">(sáb – vie)</span></p>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">Salud · seguimiento diario y semanal</div>
+          <h1 className="font-display text-3xl font-semibold uppercase leading-none md:text-4xl">Salud</h1>
         </div>
-        <button onClick={() => { setEditing(null); setShowImport(true); }} className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accentInk"><ClipboardPaste size={16} />Importar correo nuevo</button>
+        {subTab === "weekly" && (
+          <button onClick={() => { setEditing(null); setShowImport(true); }} className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accentInk">
+            <ClipboardPaste size={16} />Importar correo nuevo
+          </button>
+        )}
       </div>
 
-      <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
-        {weeks.map((w, i) => (
-          <button key={w.weekStart} onClick={() => setSel(i)} aria-pressed={i === selIdx} className={`shrink-0 rounded-lg border px-3 py-1.5 font-mono text-xs ${i === selIdx ? "border-accent bg-accent/15 text-accent" : "border-line bg-surface text-muted"}`}>{fmtShort(w.weekStart)}</button>
-        ))}
+      {/* Sub-pestañas: Resumen diario (por defecto) / Reportes semanales */}
+      <div role="tablist" aria-label="Vistas de salud" onKeyDown={handleSubTabKeyDown} className="flex gap-1 border-b border-line">
+        <button
+          type="button"
+          role="tab"
+          id="health-tab-daily"
+          data-health-tab="daily"
+          aria-selected={subTab === "daily"}
+          tabIndex={subTab === "daily" ? 0 : -1}
+          onClick={() => setSubTab("daily")}
+          className={`px-3.5 py-2.5 text-sm font-semibold transition ${subTab === "daily" ? "text-accent" : "text-muted hover:text-fg"}`}
+        >
+          Resumen diario
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="health-tab-weekly"
+          data-health-tab="weekly"
+          aria-selected={subTab === "weekly"}
+          tabIndex={subTab === "weekly" ? 0 : -1}
+          onClick={() => setSubTab("weekly")}
+          className={`px-3.5 py-2.5 text-sm font-semibold transition ${subTab === "weekly" ? "text-accent" : "text-muted hover:text-fg"}`}
+        >
+          Reportes semanales
+        </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6">
-        <Kpi label="Días entrenados" icon={Dumbbell} value={`${sessionsThisWeek}/4`} sub={<span className="inline-flex items-center gap-1"><Flame size={12} className="text-accent" />Racha: {streak} {streak === 1 ? "sesión" : "sesiones"}</span>} />
-        <Kpi label="Mejor día" icon={Trophy} value={cur.bestDay != null ? DAYS[cur.bestDay] : "—"} badge={cur.bestSteps ? fmtInt(cur.bestSteps) : null} sub={cur.bestSteps ? "pasos ese día" : "Sin dato"} />
-        <Kpi label="Pasos / día" icon={Footprints} value={fmtInt(cur.avgSteps)} sub={`${fmtInt(cur.totalSteps)} en la semana`} delta={prev ? pct(cur.avgSteps, prev.avgSteps) : null} />
-        <Kpi label="Zona activa" icon={Activity} value={fmtInt(cur.azmTotal)} sub="minutos" delta={prev ? pct(cur.azmTotal, prev.azmTotal) : null} />
-        <Kpi label="Sueño reparador" icon={Moon} value={cur.sleepAvgMin ? `${Math.floor(cur.sleepAvgMin / 60)}:${pad(cur.sleepAvgMin % 60)}` : "—"} sub="promedio por noche" delta={prev ? pct(cur.sleepAvgMin, prev.sleepAvgMin) : null} />
-        <Kpi label="FC en reposo" icon={Zap} value={cur.restingHr ? `${cur.restingHr}` : "—"} sub="lpm (más bajo es mejor)" delta={prev ? pct(cur.restingHr, prev.restingHr) : null} invert />
+      <div role="tabpanel" aria-labelledby="health-tab-daily" hidden={subTab !== "daily"}>
+        {subTab === "daily" && (
+          <div className="space-y-5">
+            <HealthRings
+              day={activeDay}
+              selectedDate={selectedDate}
+              todayKey={todayKey}
+              canPrev={canPrevDate}
+              canNext={canNextDate}
+              onPrev={goPrevDate}
+              onNext={goNextDate}
+              onToday={goTodayDate}
+              onOpenSheet={setActiveSheet}
+              vitals={vitals}
+            />
+            <WorkoutsSection workouts={workouts} log={log} bevelHistory={bevelHistory} />
+            {activeSheet && (
+              <HealthSheets
+                activeSheet={activeSheet}
+                onClose={() => setActiveSheet(null)}
+                bevelHistory={bevelHistory}
+                day={activeDay}
+                selectedDate={selectedDate}
+                todayKey={todayKey}
+                canPrev={canPrevDate}
+                canNext={canNextDate}
+                onPrev={goPrevDate}
+                onNext={goNextDate}
+              />
+            )}
+          </div>
+        )}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-display text-lg font-semibold uppercase tracking-wide">Pasos y zona activa por semana</h2>
-            <Chip>Prom. {fmtInt(avgAll)} pasos/día</Chip>
-          </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={trend} margin={{ top: 8, right: 0, left: -14, bottom: 0 }}>
-                <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 3" />
-                <XAxis dataKey="week" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={8} />
-                <YAxis yAxisId="l" tick={axisTick} axisLine={false} tickLine={false} tickFormatter={kTick} />
-                <YAxis yAxisId="r" orientation="right" tick={axisTick} axisLine={false} tickLine={false} width={34} />
-                <Tooltip {...chartTooltip} formatter={(v, n) => [fmtInt(v), n]} />
-                <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" iconSize={8} />
-                <Bar isAnimationActive={false} yAxisId="l" dataKey="pasos" name="Pasos/día" fill="var(--accent)" radius={[4, 4, 0, 0]} onClick={(_, i) => setSel(offset + i)} cursor="pointer">
-                  {trend.map((_, i) => <Cell key={i} fill={offset + i === selIdx ? "var(--accent)" : "var(--accent-dim)"} />)}
-                </Bar>
-                <Line isAnimationActive={false} yAxisId="r" type="monotone" dataKey="azm" name="Min. zona activa" stroke="var(--good)" strokeWidth={2} dot={{ r: 2.5, fill: "var(--good)" }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-          <p className="mt-2 text-xs text-muted">Toca una barra para ver esa semana. La barra resaltada es la semana seleccionada.</p>
-        </section>
+      <div role="tabpanel" aria-labelledby="health-tab-weekly" hidden={subTab !== "weekly"}>
+        {subTab === "weekly" && (
+          !cur ? (
+            <div className="space-y-5">
+              <div className="rounded-2xl border border-line bg-surface p-6 text-center">
+                <p className="text-sm text-muted">No hay semanas en el historial.</p>
+                <button onClick={() => setShowImport(true)} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accentInk"><ClipboardPaste size={16} />Importar correo</button>
+              </div>
+              <WorkoutsSection workouts={workouts} log={log} bevelHistory={bevelHistory} />
+            </div>
+          ) : (
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <div className="text-sm text-muted">
+                  Google Health · {weeks.length} {weeks.length === 1 ? "semana" : "semanas"} · Semana {fmtRange(cur)} <span className="text-muted/70">(sáb – vie)</span>
+                </div>
+              </div>
 
-        <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="font-display text-lg font-semibold uppercase tracking-wide">Vs. semana anterior</h2>
-            <span className="flex items-center gap-2 text-[11px] text-muted"><span className="h-2 w-3 rounded-full bg-accent" />actual<span className="h-1.5 w-3 rounded-full bg-cool/60" />anterior</span>
-          </div>
-          {prev ? <CompareRows cur={cur} prev={prev} /> : <p className="text-sm text-muted">Es la primera semana del historial.</p>}
-        </section>
+              <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
+                {weeks.map((w, i) => (
+                  <button key={w.weekStart} onClick={() => setSel(i)} aria-pressed={i === selIdx} className={`shrink-0 rounded-lg border px-3 py-1.5 font-mono text-xs ${i === selIdx ? "border-accent bg-accent/15 text-accent" : "border-line bg-surface text-muted"}`}>{fmtShort(w.weekStart)}</button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6">
+                <Kpi label="Días entrenados" icon={Dumbbell} value={`${sessionsThisWeek}/4`} sub={<span className="inline-flex items-center gap-1"><Flame size={12} className="text-accent" />Racha: {streak} {streak === 1 ? "sesión" : "sesiones"}</span>} />
+                <Kpi label="Mejor día" icon={Trophy} value={cur.bestDay != null ? DAYS[cur.bestDay] : "—"} badge={cur.bestSteps ? fmtInt(cur.bestSteps) : null} sub={cur.bestSteps ? "pasos ese día" : "Sin dato"} />
+                <Kpi label="Pasos / día" icon={Footprints} value={fmtInt(cur.avgSteps)} sub={`${fmtInt(cur.totalSteps)} en la semana`} delta={prev ? pct(cur.avgSteps, prev.avgSteps) : null} />
+                <Kpi label="Zona activa" icon={Activity} value={fmtInt(cur.azmTotal)} sub="minutos" delta={prev ? pct(cur.azmTotal, prev.azmTotal) : null} />
+                <Kpi label="Sueño reparador" icon={Moon} value={cur.sleepAvgMin ? `${Math.floor(cur.sleepAvgMin / 60)}:${pad(cur.sleepAvgMin % 60)}` : "—"} sub="promedio por noche" delta={prev ? pct(cur.sleepAvgMin, prev.sleepAvgMin) : null} />
+                <Kpi label="FC en reposo" icon={Zap} value={cur.restingHr ? `${cur.restingHr}` : "—"} sub="lpm (más bajo es mejor)" delta={prev ? pct(cur.restingHr, prev.restingHr) : null} invert />
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+                <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="font-display text-lg font-semibold uppercase tracking-wide">Pasos y zona activa por semana</h2>
+                    <Chip>Prom. {fmtInt(avgAll)} pasos/día</Chip>
+                  </div>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={trend} margin={{ top: 8, right: 0, left: -14, bottom: 0 }}>
+                        <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 3" />
+                        <XAxis dataKey="week" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={8} />
+                        <YAxis yAxisId="l" tick={axisTick} axisLine={false} tickLine={false} tickFormatter={kTick} />
+                        <YAxis yAxisId="r" orientation="right" tick={axisTick} axisLine={false} tickLine={false} width={34} />
+                        <Tooltip {...chartTooltip} formatter={(v, n) => [fmtInt(v), n]} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" iconSize={8} />
+                        <Bar isAnimationActive={false} yAxisId="l" dataKey="pasos" name="Pasos/día" fill="var(--accent)" radius={[4, 4, 0, 0]} onClick={(_, i) => setSel(offset + i)} cursor="pointer">
+                          {trend.map((_, i) => <Cell key={i} fill={offset + i === selIdx ? "var(--accent)" : "var(--accent-dim)"} />)}
+                        </Bar>
+                        <Line isAnimationActive={false} yAxisId="r" type="monotone" dataKey="azm" name="Min. zona activa" stroke="var(--good)" strokeWidth={2} dot={{ r: 2.5, fill: "var(--good)" }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <p className="mt-2 text-xs text-muted">Toca una barra para ver esa semana. La barra resaltada es la semana seleccionada.</p>
+                </section>
+
+                <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h2 className="font-display text-lg font-semibold uppercase tracking-wide">Vs. semana anterior</h2>
+                    <span className="flex items-center gap-2 text-[11px] text-muted"><span className="h-2 w-3 rounded-full bg-accent" />actual<span className="h-1.5 w-3 rounded-full bg-cool/60" />anterior</span>
+                  </div>
+                  {prev ? <CompareRows cur={cur} prev={prev} /> : <p className="text-sm text-muted">Es la primera semana del historial.</p>}
+                </section>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="font-display text-lg font-semibold uppercase tracking-wide">{daily ? "Pasos por día" : "Tu mejor día de la semana"}</h2>
+                    {!daily && <Chip tone="accent">Suele ser {DAYS_LONG[topDay].toLowerCase()}</Chip>}
+                  </div>
+                  <div className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      {daily ? (
+                        <BarChart data={daily} margin={{ top: 8, right: 4, left: -14, bottom: 0 }}>
+                          <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 3" />
+                          <XAxis dataKey="day" tick={axisTick} axisLine={false} tickLine={false} />
+                          <YAxis tick={axisTick} axisLine={false} tickLine={false} tickFormatter={kTick} />
+                          <Tooltip {...chartTooltip} formatter={(v) => [fmtInt(v), "Pasos"]} />
+                          <Bar isAnimationActive={false} dataKey="pasos" fill="var(--accent)" radius={[4, 4, 0, 0]}>
+                            {daily.map((d, i) => <Cell key={i} fill={d.pasos === Math.max(...cur.steps) ? "var(--accent)" : "var(--accent-dim)"} />)}
+                          </Bar>
+                        </BarChart>
+                      ) : (
+                        <BarChart data={bestFreq} margin={{ top: 8, right: 4, left: -24, bottom: 0 }}>
+                          <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 3" />
+                          <XAxis dataKey="day" tick={axisTick} axisLine={false} tickLine={false} />
+                          <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} />
+                          <Tooltip {...chartTooltip} formatter={(v) => [`${v} ${v === 1 ? "semana" : "semanas"}`, "Mejor día"]} />
+                          <Bar isAnimationActive={false} dataKey="veces" fill="var(--accent)" radius={[4, 4, 0, 0]}>
+                            {bestFreq.map((_, i) => <Cell key={i} fill={i === topDay ? "var(--accent)" : i === cur.bestDay ? "var(--cool)" : "var(--accent-dim)"} />)}
+                          </Bar>
+                        </BarChart>
+                      )}
+                    </ResponsiveContainer>
+                  </div>
+                  <p className="mt-2 text-xs text-muted">{daily ? "Datos diarios que añadiste a mano." : `Cuántas semanas fue cada día tu pico de pasos (${weeks.length} semanas). En azul, el de la semana seleccionada.`}</p>
+                </section>
+
+                <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">
+                  <h2 className="mb-3 font-display text-lg font-semibold uppercase tracking-wide">Sueño y frecuencia en reposo</h2>
+                  <div className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={trend} margin={{ top: 8, right: 0, left: -20, bottom: 0 }}>
+                        <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 3" />
+                        <XAxis dataKey="week" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={8} />
+                        <YAxis yAxisId="l" tick={axisTick} axisLine={false} tickLine={false} domain={[6, 9]} ticks={[6, 7, 8, 9]} tickFormatter={(v) => `${v} h`} />
+                        <YAxis yAxisId="r" orientation="right" tick={axisTick} axisLine={false} tickLine={false} domain={[45, 60]} ticks={[45, 50, 55, 60]} width={30} />
+                        <Tooltip {...chartTooltip} cursor={{ stroke: "var(--line)" }} formatter={(v, n) => (n === "Sueño" ? [fmtSleep(Math.round(v * 60)), n] : [`${v} lpm`, n])} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" iconSize={8} />
+                        <Line isAnimationActive={false} yAxisId="l" type="monotone" dataKey="sueño" name="Sueño" stroke="var(--cool)" strokeWidth={2.5} dot={{ r: 2.5, fill: "var(--cool)" }} />
+                        <Line isAnimationActive={false} yAxisId="r" type="monotone" dataKey="fc" name="FC reposo" stroke="var(--warn)" strokeWidth={2} strokeDasharray="4 3" dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+              </div>
+
+              <section className="rounded-2xl border border-line bg-surface p-4">
+                <h2 className="mb-3 font-display text-lg font-semibold uppercase tracking-wide">Historial</h2>
+                <ul className="divide-y divide-line">
+                  {[...weeks].reverse().map((w) => (
+                    <li key={w.weekStart} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2.5 text-sm">
+                      <span className="inline-flex min-w-[8.5rem] items-center gap-1.5 font-mono text-xs"><CalendarDays size={14} className="text-muted" />{fmtRange(w)}</span>
+                      <span className="text-muted">{fmtInt(w.avgSteps)} pasos/día</span>
+                      <span className="text-muted">{fmtInt(w.azmTotal)} AZM</span>
+                      <span className="text-muted">{fmtSleep(w.sleepAvgMin)}</span>
+                      {w.source === "gmail" && <Chip>Correo</Chip>}
+                      <span className="ml-auto flex gap-1">
+                        <button onClick={() => { setEditing(w); setShowImport(true); }} className="rounded-lg px-2.5 py-1 text-xs text-muted hover:bg-surface2 hover:text-fg">Editar</button>
+                        {confirmDel === w.weekStart ? (
+                          <button onClick={() => hideWeek(w.weekStart)} className="rounded-lg bg-warn/20 px-2.5 py-1 text-xs text-warn">¿Quitar? Confirmar</button>
+                        ) : (
+                          <button onClick={() => setConfirmDel(w.weekStart)} className="rounded-lg p-1.5 text-muted hover:text-warn" aria-label="Quitar semana"><Trash2 size={14} /></button>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </div>
+          )
+        )}
       </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-display text-lg font-semibold uppercase tracking-wide">{daily ? "Pasos por día" : "Tu mejor día de la semana"}</h2>
-            {!daily && <Chip tone="accent">Suele ser {DAYS_LONG[topDay].toLowerCase()}</Chip>}
-          </div>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              {daily ? (
-                <BarChart data={daily} margin={{ top: 8, right: 4, left: -14, bottom: 0 }}>
-                  <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 3" />
-                  <XAxis dataKey="day" tick={axisTick} axisLine={false} tickLine={false} />
-                  <YAxis tick={axisTick} axisLine={false} tickLine={false} tickFormatter={kTick} />
-                  <Tooltip {...chartTooltip} formatter={(v) => [fmtInt(v), "Pasos"]} />
-                  <Bar isAnimationActive={false} dataKey="pasos" fill="var(--accent)" radius={[4, 4, 0, 0]}>
-                    {daily.map((d, i) => <Cell key={i} fill={d.pasos === Math.max(...cur.steps) ? "var(--accent)" : "var(--accent-dim)"} />)}
-                  </Bar>
-                </BarChart>
-              ) : (
-                <BarChart data={bestFreq} margin={{ top: 8, right: 4, left: -24, bottom: 0 }}>
-                  <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 3" />
-                  <XAxis dataKey="day" tick={axisTick} axisLine={false} tickLine={false} />
-                  <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip {...chartTooltip} formatter={(v) => [`${v} ${v === 1 ? "semana" : "semanas"}`, "Mejor día"]} />
-                  <Bar isAnimationActive={false} dataKey="veces" fill="var(--accent)" radius={[4, 4, 0, 0]}>
-                    {bestFreq.map((_, i) => <Cell key={i} fill={i === topDay ? "var(--accent)" : i === cur.bestDay ? "var(--cool)" : "var(--accent-dim)"} />)}
-                  </Bar>
-                </BarChart>
-              )}
-            </ResponsiveContainer>
-          </div>
-          <p className="mt-2 text-xs text-muted">{daily ? "Datos diarios que añadiste a mano." : `Cuántas semanas fue cada día tu pico de pasos (${weeks.length} semanas). En azul, el de la semana seleccionada.`}</p>
-        </section>
-
-        <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">
-          <h2 className="mb-3 font-display text-lg font-semibold uppercase tracking-wide">Sueño y frecuencia en reposo</h2>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trend} margin={{ top: 8, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 3" />
-                <XAxis dataKey="week" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={8} />
-                <YAxis yAxisId="l" tick={axisTick} axisLine={false} tickLine={false} domain={[6, 9]} ticks={[6, 7, 8, 9]} tickFormatter={(v) => `${v} h`} />
-                <YAxis yAxisId="r" orientation="right" tick={axisTick} axisLine={false} tickLine={false} domain={[45, 60]} ticks={[45, 50, 55, 60]} width={30} />
-                <Tooltip {...chartTooltip} cursor={{ stroke: "var(--line)" }} formatter={(v, n) => (n === "Sueño" ? [fmtSleep(Math.round(v * 60)), n] : [`${v} lpm`, n])} />
-                <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" iconSize={8} />
-                <Line isAnimationActive={false} yAxisId="l" type="monotone" dataKey="sueño" name="Sueño" stroke="var(--cool)" strokeWidth={2.5} dot={{ r: 2.5, fill: "var(--cool)" }} />
-                <Line isAnimationActive={false} yAxisId="r" type="monotone" dataKey="fc" name="FC reposo" stroke="var(--warn)" strokeWidth={2} strokeDasharray="4 3" dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
-      </div>
-
-      <WorkoutsSection workouts={workouts} log={log} />
-
-      <section className="rounded-2xl border border-line bg-surface p-4">
-        <h2 className="mb-3 font-display text-lg font-semibold uppercase tracking-wide">Historial</h2>
-        <ul className="divide-y divide-line">
-          {[...weeks].reverse().map((w) => (
-            <li key={w.weekStart} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2.5 text-sm">
-              <span className="inline-flex min-w-[8.5rem] items-center gap-1.5 font-mono text-xs"><CalendarDays size={14} className="text-muted" />{fmtRange(w)}</span>
-              <span className="text-muted">{fmtInt(w.avgSteps)} pasos/día</span>
-              <span className="text-muted">{fmtInt(w.azmTotal)} AZM</span>
-              <span className="text-muted">{fmtSleep(w.sleepAvgMin)}</span>
-              {w.source === "gmail" && <Chip>Correo</Chip>}
-              <span className="ml-auto flex gap-1">
-                <button onClick={() => { setEditing(w); setShowImport(true); }} className="rounded-lg px-2.5 py-1 text-xs text-muted hover:bg-surface2 hover:text-fg">Editar</button>
-                {confirmDel === w.weekStart ? (
-                  <button onClick={() => hideWeek(w.weekStart)} className="rounded-lg bg-warn/20 px-2.5 py-1 text-xs text-warn">¿Quitar? Confirmar</button>
-                ) : (
-                  <button onClick={() => setConfirmDel(w.weekStart)} className="rounded-lg p-1.5 text-muted hover:text-warn" aria-label="Quitar semana"><Trash2 size={14} /></button>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
 
       {showImport && <ImportPanel initial={editing} onSave={saveWeek} onClose={() => { setShowImport(false); setEditing(null); }} />}
     </div>

@@ -2,6 +2,7 @@
 import { MAIN } from "./planner.js";
 import { DEFAULT_HABIT_DEFS, reqDone } from "../data/habits.js";
 import { dkey } from "./dates.js";
+import { isPoorSleep, fmtSleep } from "./sleep.js";
 
 // Progreso de la semana en curso (lunes a hoy) para los tres anillos de Inicio.
 // - sesiones: rutinas principales distintas hechas (en Shift o cubiertas por Fitbit) de 4.
@@ -39,4 +40,58 @@ export function todayPlan({ info, logged, fromFitbit }) {
   if (fromFitbit) return { state: "fitbit", rid: fromFitbit };
   if (info && info.rid) return { state: "planned", rid: info.rid, evening: !!info.evening, office: !!info.office };
   return { state: "rest", rid: null, office: !!(info && info.office) };
+}
+
+/**
+ * Unifica el aviso del planificador Bevel y la alerta de sueño corto (< 6 h) en la tarjeta «Hoy»
+ * para que nunca aparezcan dos avisos duplicados a la vez.
+ */
+export function buildTodayBevelBanner({ plan, night, bevelAdjustment }) {
+  const adj = bevelAdjustment && typeof bevelAdjustment === "object" ? bevelAdjustment : null;
+  const isPlannedMain = plan && plan.state === "planned" && plan.rid && plan.rid !== "low";
+  const poorSleep = isPoorSleep(night);
+
+  if (adj && adj.applied) {
+    const tone = adj.action === "prioritize" ? "good" : adj.action === "unstack" ? "cool" : "warn";
+    const text = adj.reason || "";
+    const extraGuidance = adj.guidance && !text.includes(adj.guidance) ? ` ${adj.guidance}` : "";
+    return {
+      tone,
+      title: adj.action === "prioritize" ? "Plan ajustado por recuperación alta" : "Plan ajustado por recuperación",
+      text: `${text}${extraGuidance}`.trim(),
+      offerLow: false,
+    };
+  }
+
+  if (adj && adj.biometricsOff) {
+    return {
+      tone: "warn",
+      title: "Señales biométricas fuera de rango",
+      text: adj.reason || "Prioriza descanso, hidratación y sueño hoy.",
+      offerLow: !!isPlannedMain,
+    };
+  }
+
+  if (isPlannedMain && poorSleep) {
+    const guidance = adj && adj.guidance ? ` ${adj.guidance}` : "";
+    return {
+      tone: "warn",
+      title: `Dormiste ${fmtSleep(night.min)}.`,
+      text: guidance
+        ? `Con poco sueño rinde más una sesión liviana.${guidance}`
+        : "Con poco sueño rinde más una sesión liviana: haz la suave de 20 min o quita una serie por ejercicio.",
+      offerLow: true,
+    };
+  }
+
+  if (adj && adj.guidance && plan && plan.state === "planned") {
+    return {
+      tone: "cool",
+      title: "Guía de esfuerzo para hoy",
+      text: adj.reason || adj.guidance,
+      offerLow: false,
+    };
+  }
+
+  return null;
 }

@@ -150,3 +150,27 @@ export function deriveWeek(w) {
 }
 
 export const fmtRange = (w) => `${fmtShort(w.weekStart)} – ${fmtShort(dkey(addDays(fromKey(w.weekStart), 6)))}`;
+
+/**
+ * Oculta o elimina una semana del historial `health` sin romper semanas base (seed).
+ */
+export function hideHealthWeek(list, weekStart, seed = GH_SEED) {
+  if (!weekStart) return Array.isArray(list) ? list : [];
+  const filtered = (Array.isArray(list) ? list : []).filter((w) => w && w.weekStart !== weekStart);
+  const inSeed = Array.isArray(seed) && seed.some((w) => w && w.weekStart === weekStart);
+  if (inSeed) filtered.push({ weekStart, hidden: true });
+  return filtered.sort((a, b) => a.weekStart.localeCompare(b.weekStart)).slice(-156);
+}
+
+/**
+ * Busca el aporte de Strain y métricas enriquecidas de un entreno en `bevelHistory`.
+ */
+export function findWorkoutStrain(bevelHistory, workout) {
+  if (!bevelHistory || !bevelHistory.byDate || !workout || !workout.date) return null;
+  const day = bevelHistory.byDate[workout.date];
+  const list = day && day.strain && Array.isArray(day.strain.workouts) ? day.strain.workouts : null;
+  if (!list || !list.length) return null;
+  const byId = workout.id ? list.find((w) => w && w.id === workout.id) : null;
+  if (byId) return byId;
+  return list.find((w) => w && w.kind === workout.kind && (workout.min == null || w.min === Math.round(workout.min))) || null;
+}
