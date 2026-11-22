@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { trendCard, seriesOf, dailyStress, stressLevel, loadStatus, trainingLoad, muscleFreshness, exercisePattern, cardioFocus } from "../src/lib/metrics.js";
+import { trendCard, seriesOf, dailyStress, stressLevel, loadStatus, trainingLoad, muscleFreshness, muscleGroups, routineMuscles, recommendTraining, exercisePattern, cardioFocus } from "../src/lib/metrics.js";
 import { dkey, fromKey, addDays } from "../src/lib/dates.js";
 
 const day = (base, n) => dkey(addDays(fromKey(base), n));
@@ -79,4 +79,47 @@ test("cardioFocus: null sin zonas; porcentajes cuando hay zonas", () => {
   assert.equal(cardioFocus([{ start: `${D}T12:00:00Z` }], D), null);
   const f = cardioFocus([{ start: `${D}T12:00:00Z`, zones: { light: 10, moderate: 10, vigorous: 15, peak: 5 } }], D);
   assert.deepEqual(f.focus, { lowAerobic: 50, highAerobic: 38, anaerobic: 13 });
+});
+
+test("muscleGroups: estado, volumen y carga; «Ya la hice» cuenta las series planeadas", () => {
+  const setLog = { [day(D, -1)]: { d2: { d2a: Array(4).fill({ reps: 8, load: "40" }), d2b: Array(3).fill({ reps: 6, load: "" }), d2c1: Array(3).fill({ reps: 8, load: "" }) } } };
+  const { groups, counts } = muscleGroups(setLog, D);
+  const quads = groups.find((g) => g.group === "quads");
+  assert.equal(quads.sets, 10);
+  assert.equal(quads.reps, 32 + 18 + 24);
+  assert.equal(quads.trained, true);
+  assert.equal(quads.status, quads.pct >= 80 ? "recovered" : quads.pct >= 50 ? "fatigued" : "depleted");
+  assert.ok(quads.pct < 80);
+  assert.equal(groups.find((g) => g.group === "chest").trained, false);
+  assert.equal(counts.recovered + counts.fatigued + counts.depleted, groups.length);
+
+  // Sesión marcada sin series → usa la rutina planeada.
+  const viaLog = muscleGroups({}, D, { log: { [day(D, -1)]: { r: "d1" } } }).groups;
+  assert.ok(viaLog.find((g) => g.group === "lats").pct < 100);
+  assert.equal(viaLog.find((g) => g.group === "quads").trained, false);
+  // Si el día ya tiene series de esa rutina, no se duplica.
+  const both = muscleGroups(setLog, D, { log: { [day(D, -1)]: { r: "d2" } } }).groups.find((g) => g.group === "quads");
+  assert.equal(both.sets, 10);
+  // Fuera de la ventana de 7 días no suma volumen.
+  assert.equal(muscleGroups(setLog, day(D, 8)).groups.find((g) => g.group === "quads").sets, 0);
+});
+
+test("routineMuscles: pierna pesa en cuádriceps; torso en dorsales/pecho", () => {
+  assert.equal(routineMuscles("d2").quads, 1);
+  assert.ok(!routineMuscles("d2").chest);
+  assert.ok(routineMuscles("d1").lats > 0.4 && routineMuscles("d1").chest > 0.4);
+});
+
+test("recommendTraining: evita lo fatigado, sesión suave con recuperación baja, nada si ya entrenaste", () => {
+  const legsYesterday = { [day(D, -1)]: { d2: { d2a: Array(4).fill({ reps: 8 }), d2b: Array(3).fill({ reps: 6 }), d2c1: Array(3).fill({ reps: 8 }), d2d: Array(3).fill({ reps: 8 }) } } };
+  const { groups } = muscleGroups(legsYesterday, D);
+  const rec = recommendTraining({ groups, recovery: 70 });
+  assert.equal(rec.kind, "train");
+  assert.equal(rec.rid, "d1");
+  assert.match(rec.reason, /Dejas descansar/);
+  assert.equal(recommendTraining({ groups, recovery: 25 }).kind, "low");
+  assert.equal(recommendTraining({ groups, doneToday: "d1" }).kind, "done");
+  // Ya hiciste torso esta semana → baja en el ranking.
+  const fresh = muscleGroups({}, D).groups;
+  assert.notEqual(recommendTraining({ groups: fresh, weekDone: ["d1", "d1"] }).rid, "d1");
 });

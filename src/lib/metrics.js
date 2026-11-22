@@ -3,7 +3,7 @@
 // Funciones puras: la UI solo las llama y pinta. Contrato completo en METRICAS.md.
 import { dkey, fromKey, addDays, dayDiff } from "./dates.js";
 import { median, mad, clamp, MAD_SCALE } from "./baselines.js";
-import { ROUTINES, day3Exercises } from "../data/program.js";
+import { ROUTINES, day3Exercises, routineById } from "../data/program.js";
 import { SUBS, EXERCISE_LIBRARY } from "../data/subs.js";
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
@@ -208,42 +208,161 @@ export function exercisePattern(exId) {
 const RECOVERY_HOURS = 72;     // un grupo «cargado al máximo» vuelve a 100 % en ~72 h
 const SETS_TO_FULL_FATIGUE = 10; // 10 series efectivas de motor principal = 0 % fresco
 
+// Estado de un grupo según su frescura (mismos cortes que la tarjeta: 80 / 50).
+export const FRESH_STATUS = Object.freeze({
+  recovered: { label: "Recuperado", tone: "good" },
+  fatigued: { label: "Fatigado", tone: "accent" },
+  depleted: { label: "Agotado", tone: "warn" },
+});
+export const freshnessStatus = (pct) => (pct >= 80 ? "recovered" : pct >= 50 ? "fatigued" : "depleted");
+
+const firstInt = (txt, fallback) => {
+  const m = String(txt || "").match(/\d+/);
+  return m ? Number(m[0]) : fallback;
+};
+
 /**
- * Frescura por grupo muscular (0–100 %) a partir de las series registradas (setLog).
- * @param {Record<string, Record<string, Record<string, Array>>>} setLog  fecha → rutina → ejercicio → series
- * @param {string} dateKey
- * @param {{ now?: Date, sessionHour?: number }} [opts]
- * @returns {Array<{ group: string, label: string, pct: number, lastDate: string|null, sets: number }>}
+ * Series de trabajo por día y ejercicio: lo registrado en setLog y, para sesiones marcadas
+ * con «Ya la hice» (log) sin series, las series planeadas de esa rutina. Entrenos de Fitbit
+ * tipo «run» en días sin sesión de Shift cuentan como trote (patrón run).
+ * @returns {Array<{ day: string, exId: string|null, pattern: string, sets: number, reps: number }>}
  */
-export function muscleFreshness(setLog, dateKey, { now = null, sessionHour = 7 } = {}) {
-  const ref = now instanceof Date ? now : new Date(fromKey(dateKey).getTime() + 23.99 * 3600e3);
-  const fatigue = {};
-  const last = {};
-  const sets7 = {};
+function workEntries(setLog, { log = null, workouts = null } = {}) {
+  const out = [];
   for (const [day, routines] of Object.entries(setLog || {})) {
-    const hoursAgo = (ref - (fromKey(day).getTime() + sessionHour * 3600e3)) / 3600e3;
-    if (hoursAgo < 0) continue;
-    const decay = Math.max(0, 1 - hoursAgo / RECOVERY_HOURS);
     for (const exs of Object.values(routines || {})) {
       for (const [exId, series] of Object.entries(exs || {})) {
-        const n = (Array.isArray(series) ? series : []).filter((x) => x && isNum(x.reps) && x.reps > 0).length;
-        if (!n) continue;
-        const muscles = PATTERN_MUSCLES[exercisePattern(exId)] || {};
-        for (const [g, w] of Object.entries(muscles)) {
-          fatigue[g] = (fatigue[g] || 0) + (n * w * decay) / SETS_TO_FULL_FATIGUE;
-          if (!last[g] || day > last[g]) last[g] = day;
-          if (hoursAgo <= 7 * 24) sets7[g] = (sets7[g] || 0) + n * w;
-        }
+        const ok = (Array.isArray(series) ? series : []).filter((x) => x && isNum(x.reps) && x.reps > 0);
+        if (!ok.length) continue;
+        out.push({ day, exId, pattern: exercisePattern(exId), sets: ok.length, reps: ok.reduce((a, x) => a + x.reps, 0) });
       }
     }
   }
-  return Object.entries(MUSCLE_GROUPS).map(([group, label]) => ({
-    group,
-    label,
-    pct: Math.round(clamp(100 * (1 - (fatigue[group] || 0)), 0, 100)),
-    lastDate: last[group] || null,
-    sets: r1(sets7[group] || 0),
-  }));
+  for (const [day, entry] of Object.entries(log || {})) {
+    const rid = entry && entry.r;
+    if (!rid || (setLog?.[day]?.[rid] && Object.keys(setLog[day][rid]).length)) continue;
+    const routine = routineById(rid, 1, entry.v);
+    for (const ex of routine?.exercises || []) {
+      if (!ex.pattern) continue;
+      const sets = ex.sets || 0;
+      out.push({ day, exId: ex.id, pattern: ex.pattern, sets, reps: sets * firstInt(ex.reps, 10), planned: true });
+    }
+  }
+  for (const w of Array.isArray(workouts) ? workouts : []) {
+    if (!w || w.kind !== "run" || !w.start || !isNum(w.min)) continue;
+    const day = dkey(new Date(w.start));
+    if (log?.[day]?.r) continue;
+    const sets = Math.max(1, Math.round(w.min / 10));
+    out.push({ day, exId: null, pattern: "run", sets, reps: sets * 10 });
+  }
+  return out;
+}
+
+/**
+ * Grupos musculares a una fecha: frescura (0–100 %), estado, volumen (series ponderadas)
+ * y carga (repeticiones ponderadas) de los últimos `days` días.
+ * @param {object} setLog  fecha → rutina → ejercicio → series
+ * @param {string} dateKey
+ * @param {{ log?: object, workouts?: Array, now?: Date, sessionHour?: number, days?: number }} [opts]
+ * @returns {{ groups: Array<{ group, label, pct, status, sets, reps, lastDate, trained }>,
+ *            counts: { recovered: number, fatigued: number, depleted: number } }}
+ */
+export function muscleGroups(setLog, dateKey, { log = null, workouts = null, now = null, sessionHour = 7, days = 7 } = {}) {
+  const ref = now instanceof Date ? now : new Date(fromKey(dateKey).getTime() + 23.99 * 3600e3);
+  const fatigue = {};
+  const last = {};
+  const sets = {};
+  const reps = {};
+  for (const e of workEntries(setLog, { log, workouts })) {
+    const hoursAgo = (ref - (fromKey(e.day).getTime() + sessionHour * 3600e3)) / 3600e3;
+    if (hoursAgo < 0) continue;
+    const decay = Math.max(0, 1 - hoursAgo / RECOVERY_HOURS);
+    const inWindow = hoursAgo <= days * 24;
+    for (const [g, w] of Object.entries(PATTERN_MUSCLES[e.pattern] || {})) {
+      fatigue[g] = (fatigue[g] || 0) + (e.sets * w * decay) / SETS_TO_FULL_FATIGUE;
+      if (inWindow) {
+        sets[g] = (sets[g] || 0) + e.sets * w;
+        reps[g] = (reps[g] || 0) + e.reps * w;
+        if (!last[g] || e.day > last[g]) last[g] = e.day;
+      }
+    }
+  }
+  const counts = { recovered: 0, fatigued: 0, depleted: 0 };
+  const groups = Object.entries(MUSCLE_GROUPS).map(([group, label]) => {
+    const pct = Math.round(clamp(100 * (1 - (fatigue[group] || 0)), 0, 100));
+    const status = freshnessStatus(pct);
+    counts[status] += 1;
+    return {
+      group, label, pct, status,
+      sets: r1(sets[group] || 0),
+      reps: Math.round(reps[group] || 0),
+      lastDate: last[group] || null,
+      trained: (sets[group] || 0) > 0,
+    };
+  });
+  return { groups, counts };
+}
+
+/**
+ * Frescura por grupo muscular (0–100 %) a partir de las series registradas (setLog).
+ * Atajo de muscleGroups() que conserva la forma de siempre.
+ * @returns {Array<{ group: string, label: string, pct: number, lastDate: string|null, sets: number }>}
+ */
+export function muscleFreshness(setLog, dateKey, opts = {}) {
+  return muscleGroups(setLog, dateKey, opts).groups.map(({ group, label, pct, lastDate, sets }) => ({ group, label, pct, lastDate, sets }));
+}
+
+/** Peso de cada grupo en una rutina (0–1, 1 = el grupo que más series recibe). */
+export function routineMuscles(rid, variantId = null) {
+  const routine = routineById(rid, 1, variantId);
+  const acc = {};
+  for (const ex of routine?.exercises || []) {
+    for (const [g, w] of Object.entries(PATTERN_MUSCLES[ex.pattern] || {})) acc[g] = (acc[g] || 0) + (ex.sets || 1) * w;
+  }
+  const max = Math.max(0, ...Object.values(acc));
+  return Object.fromEntries(Object.entries(acc).map(([g, v]) => [g, max ? r1(v / max) : 0]));
+}
+
+const RECOMMENDABLE = ["d1", "d2", "d3", "d4"];
+
+/**
+ * Qué conviene entrenar hoy: ordena las rutinas por lo frescos que están sus músculos
+ * principales, con un empujón a la del plan y a las que aún no hiciste esta semana.
+ * Con recuperación baja propone la sesión suave.
+ * @param {{ groups: Array, recovery?: number|null, plannedRid?: string|null, doneToday?: string|null,
+ *           weekDone?: string[], routineVariants?: object }} input
+ * @returns {{ rid: string|null, kind: "train"|"low"|"done", readiness: number|null, reason: string,
+ *            fresh: Array, tired: Array, ranking: Array<{ rid, readiness, score }> }}
+ */
+export function recommendTraining({ groups, recovery = null, plannedRid = null, doneToday = null, weekDone = [], routineVariants = {} }) {
+  const byGroup = Object.fromEntries((groups || []).map((g) => [g.group, g]));
+  const ranking = RECOMMENDABLE.map((rid) => {
+    const weights = routineMuscles(rid, routineVariants?.[rid]);
+    const main = Object.entries(weights).filter(([, w]) => w >= 0.4);
+    const tot = main.reduce((a, [, w]) => a + w, 0);
+    const readiness = tot ? Math.round(main.reduce((a, [g, w]) => a + w * (byGroup[g]?.pct ?? 100), 0) / tot) : 100;
+    const timesThisWeek = weekDone.filter((r) => r === rid).length;
+    const score = readiness + (rid === plannedRid ? 6 : 0) + (timesThisWeek ? -10 * timesThisWeek : 6);
+    return { rid, readiness, score, main: main.sort((a, b) => b[1] - a[1]).map(([g]) => g) };
+  }).sort((a, b) => b.score - a.score);
+
+  const tired = (groups || []).filter((g) => g.status !== "recovered").sort((a, b) => a.pct - b.pct);
+  if (doneToday) {
+    return { rid: null, kind: "done", readiness: null, reason: "Ya entrenaste hoy: deja que los músculos recuperen.", fresh: [], tired, ranking };
+  }
+  const top = ranking[0];
+  const fresh = top.main.map((g) => byGroup[g]).filter(Boolean).slice(0, 3);
+  if (isNum(recovery) && (recovery < 34 || (recovery < 50 && top.readiness < 70))) {
+    return {
+      rid: "low", kind: "low", readiness: top.readiness,
+      reason: `Recuperación ${Math.round(recovery)} %: hoy rinde más una sesión suave que cargar músculos.`,
+      fresh, tired, ranking,
+    };
+  }
+  const avoid = tired.find((g) => !top.main.includes(g.group));
+  const reason = (top.readiness >= 80 ? "Los músculos de esta rutina están frescos." : "Es la rutina con los músculos más recuperados.")
+    + (avoid ? ` Dejas descansar ${avoid.label.toLowerCase()} (${avoid.pct} %).` : "");
+  return { rid: top.rid, kind: "train", readiness: top.readiness, reason, fresh, tired, ranking };
 }
 
 // ───────────────────────── Cardio Focus y zonas ─────────────────────────

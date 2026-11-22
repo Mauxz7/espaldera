@@ -55,6 +55,24 @@ Etiquetas: Calibrando, Desentrenando, Manteniendo, Productivo, En pico, Fatigado
 Grupos: `MUSCLE_GROUPS` (pecho, dorsales, espalda alta, hombros, bíceps, tríceps, core,
 cuádriceps, glúteos, isquios, pantorrillas). `sets` = series efectivas de los últimos 7 días.
 
+### `muscleGroups(setLog, dateKey, { log, workouts, days: 7 })` → hoja «Grupos musculares»
+```js
+{ groups: [{ group, label, pct: 66, status: "fatigued", sets: 10, reps: 90, lastDate, trained: true }, ...],
+  counts: { recovered: 8, fatigued: 3, depleted: 0 } }
+```
+`status` con `freshnessStatus(pct)`: ≥80 `recovered`, ≥50 `fatigued`, si no `depleted` (`FRESH_STATUS` trae etiqueta y tono).
+Sesiones de `log` sin series registradas cuentan con las series planeadas de la rutina; entrenos
+de Fitbit `kind: "run"` cuentan como trote en días sin sesión de Shift. `reps` = carga (repeticiones
+ponderadas), `sets` = volumen. `muscleFreshness()` es un atajo con la forma anterior.
+
+### `recommendTraining({ groups, recovery, plannedRid, doneToday, weekDone, routineVariants })` → Entreno
+```js
+{ rid: "d3", kind: "train" | "low" | "done", readiness: 92, reason: "…", fresh: [grupo], tired: [grupo], ranking: [{ rid, readiness, score }] }
+```
+Ordena d1–d4 por la frescura media de sus músculos principales (`routineMuscles(rid)`, peso ≥ 0,4),
++6 si es la del plan, +6 si aún no se hizo esta semana, −10 por cada vez que ya se hizo.
+Recuperación < 34 (o < 50 con readiness < 70) → `low`. Si ya hay sesión hoy → `done`.
+
 ### `cardioFocus(workouts, dateKey, { days: 30 })` → zonas de los entrenos
 ```js
 { minutes: { light, moderate, vigorous, peak }, focus: { lowAerobic: 45, highAerobic: 17, anaerobic: 38 } } | null
