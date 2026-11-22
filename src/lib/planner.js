@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { usePersisted } from "./storage.js";
-import { dkey, fromKey, addDays, mondayOf, dayDiff, pruneDays } from "./dates.js";
+import { dkey, fromKey, addDays, mondayOf, dayDiff, pruneDays, DAYS_LONG } from "./dates.js";
 import { routineById } from "../data/program.js";
 import { calNight, calExamSoon } from "./calendar.js";
 
@@ -10,13 +10,55 @@ export const TAG = { d1: "TOR", d2: "PIE", d3: "RUN", d4: "FUL", low: "RES" };
 
 export const DEFAULT_OFFICE = [true, false, true, true, true, false, false]; // Lun…Dom: true = voy a la oficina
 
+// Prioridad de carga para favorecer sesiones exigentes cuando la recuperación es alta.
+const SESSION_PRIORITY = { d2: 4, d4: 3, d3: 2, d1: 1 };
+
+export function normalizeBevelSignal(bevelInput, dateKey = null) {
+  if (!bevelInput || typeof bevelInput !== "object") return null;
+  const day = bevelInput.byDate && typeof bevelInput.byDate === "object"
+    ? ((dateKey && bevelInput.byDate[dateKey]) || bevelInput.today || null)
+    : bevelInput;
+  if (!day || typeof day !== "object") return null;
+
+  const rec = day.recovery && typeof day.recovery === "object" ? day.recovery : null;
+  if (!rec) return null;
+  const hasScore = typeof rec.score === "number" && Number.isFinite(rec.score);
+  const biometricsOff = rec.alert === "biometrics_off";
+  if (!hasScore && !rec.zone && !biometricsOff) return null;
+
+  const recoveryScore = hasScore ? Math.round(rec.score) : null;
+  let zone = rec.zone || null;
+  if (biometricsOff || (recoveryScore != null && recoveryScore <= 33)) zone = "low";
+  else if (!zone && recoveryScore != null) zone = recoveryScore >= 67 ? "high" : "mid";
+  if (!zone) return null;
+
+  const strain = day.strain && typeof day.strain === "object" ? day.strain : null;
+  const targetStrain = strain && strain.target && typeof strain.target === "object"
+    ? { min: strain.target.min, max: strain.target.max, label: strain.target.label }
+    : zone === "high"
+      ? { min: 60, max: 85, label: "Óptimo" }
+      : zone === "mid"
+        ? { min: 35, max: 60, label: "Moderado" }
+        : { min: 15, max: 35, label: "Suave" };
+
+  return {
+    recoveryScore,
+    zone,
+    biometricsOff,
+    alert: rec.alert || null,
+    strainScore: strain && typeof strain.score === "number" && Number.isFinite(strain.score) ? strain.score : null,
+    targetStrain,
+  };
+}
+
 // Puntaje de una semana (menor es mejor). arr[i] = rutina del día i o null.
 // Un día de oficina con la noche libre (sin clase) se entrena de noche: no compite con la mañana corta.
 export const isEvening = (office, night, i) => !!(night && night[i] && office[i]);
 
 // tail: los dos últimos días de la semana anterior ({ r1: domingo, r2: sábado, effort1, eve1 }).
 // Así el lunes no se planea «en blanco»: si el domingo hubo pierna o deporte fuerte, cuenta como el día anterior.
-export function scorePlan(arr, office, night, effort, exam, tail) {
+// bevelOpts (opcional): { todayIdx, zone, biometricsOff } para modular la puntuación de hoy según recuperación.
+export function scorePlan(arr, office, night, effort, exam, tail, bevelOpts = null) {
   const t = tail || {};
   const P = (j) => (j >= 0 ? arr[j] : j === -1 ? t.r1 || null : j === -2 ? t.r2 || null : null);
   const E = (j) => (j >= 0 ? !!(effort && effort[j]) : j === -1 ? !!t.effort1 : false);
@@ -46,12 +88,28 @@ export function scorePlan(arr, office, night, effort, exam, tail) {
       if (P(i - 2)) s += 8; // tres días seguidos
     }
   }
+  if (bevelOpts && typeof bevelOpts.todayIdx === "number" && bevelOpts.todayIdx >= 0 && bevelOpts.todayIdx < 7) {
+    const ti = bevelOpts.todayIdx;
+    const r = arr[ti];
+    if (r && MAIN.includes(r)) {
+      if (bevelOpts.zone === "low" || bevelOpts.biometricsOff) {
+        s += r === "d2" || r === "d4" ? 25 : r === "d3" ? 20 : 18;
+      } else if (bevelOpts.zone === "mid") {
+        const prevHeavy = !!(P(ti - 1) && MAIN.includes(P(ti - 1))) || E(ti - 1);
+        const nextHeavy = ti < 6 && !!(arr[ti + 1] && MAIN.includes(arr[ti + 1]));
+        if (prevHeavy) s += r === "d2" || r === "d4" ? 12 : 8;
+        if (nextHeavy) s += 8;
+      } else if (bevelOpts.zone === "high") {
+        s -= r === "d2" || r === "d4" ? 6 : 3;
+      }
+    }
+  }
   s += MAIN.filter((m) => !arr.includes(m)).length * 100; // sesión que no cabe
   return s;
 }
 
 // Todas las formas de colocar las sesiones pendientes en los días libres desde fromIdx, de mejor a peor.
-export function rankPlans(office, fixed, fromIdx, night, effort, exam, tail) {
+export function rankPlans(office, fixed, fromIdx, night, effort, exam, tail, bevelOpts = null) {
   const done = Object.values(fixed);
   const left = MAIN.filter((m) => !done.includes(m));
   const free = [];
@@ -60,7 +118,7 @@ export function rankPlans(office, fixed, fromIdx, night, effort, exam, tail) {
   Object.keys(fixed).forEach((i) => { base[i] = fixed[i]; });
   const out = [];
   const rec = (si, arr) => {
-    if (si === left.length) { out.push({ arr: arr.slice(), score: scorePlan(arr, office, night, effort, exam, tail) }); return; }
+    if (si === left.length) { out.push({ arr: arr.slice(), score: scorePlan(arr, office, night, effort, exam, tail, bevelOpts) }); return; }
     for (const d of free) if (!arr[d]) { arr[d] = left[si]; rec(si + 1, arr); arr[d] = null; }
     rec(si + 1, arr);
   };
@@ -112,6 +170,219 @@ export function weekTail(weekPlan, log, mk, workouts, calBusy, today = dkey()) {
   return { r1, r2: pick(5), effort1: !!pw.effort[6], eve1: !!r1 && isEvening(pw.office, pw.night, 6) };
 }
 
+function pickBestValid(ranked) {
+  return ranked.find((p) => p.score < 900) || ranked[0] || null;
+}
+
+function countMain(arr) {
+  return (arr || []).filter((r) => MAIN.includes(r)).length;
+}
+
+function hasBackToBackAt(arr, idx, effort, tail) {
+  const cur = arr[idx];
+  if (!cur || !MAIN.includes(cur)) return false;
+  const prevR = idx > 0 ? arr[idx - 1] : (tail && tail.r1) || null;
+  const prevE = idx > 0 ? !!(effort && effort[idx - 1]) : !!(tail && tail.effort1);
+  const nextR = idx < 6 ? arr[idx + 1] : null;
+  const prevHeavy = !!(prevR && MAIN.includes(prevR)) || prevE;
+  const nextHeavy = !!(nextR && MAIN.includes(nextR));
+  return prevHeavy || nextHeavy;
+}
+
+/**
+ * Aplica ajuste opcional basado en el estado Bevel del día (`recovery` y `strain`)
+ * sobre el plan de la semana en curso sin sobrescribir sesiones ya completadas ni romper reglas de calendario.
+ */
+export function applyBevelAdjustment({ arr, keys, office, night, fixed, effort, exam, tail, todayIdx, bevel }) {
+  const signal = normalizeBevelSignal(bevel, todayIdx >= 0 && todayIdx < 7 ? keys[todayIdx] : null);
+  if (!signal || todayIdx < 0 || todayIdx > 6) {
+    return { arr, bevelAdjustment: null };
+  }
+
+  const { recoveryScore, zone, biometricsOff, targetStrain } = signal;
+  const baseMeta = { recoveryScore, zone, targetStrain, biometricsOff };
+  const originalCode = arr[todayIdx] || null;
+
+  // Nunca sobrescribir una sesión ya completada hoy (registro en Shift o entreno de Fitbit).
+  if (fixed && fixed[todayIdx]) {
+    return {
+      arr,
+      bevelAdjustment: {
+        ...baseMeta,
+        applied: false,
+        action: "completed",
+        originalCode,
+        recommendedCode: originalCode,
+        reason: "Ya completaste la sesión de hoy; mantenemos tu registro sin cambios.",
+      },
+    };
+  }
+
+  // 1. Recuperación baja (<= 33%) o biomarcadores fuera de rango (`biometrics_off`).
+  if (zone === "low" || biometricsOff) {
+    if (!originalCode || !MAIN.includes(originalCode)) {
+      return {
+        arr,
+        bevelAdjustment: {
+          ...baseMeta,
+          applied: false,
+          action: "keep_rest",
+          originalCode,
+          recommendedCode: originalCode,
+          reason: biometricsOff
+            ? "Tus señales biométricas están fuera de rango. Hoy toca descanso: prioriza hidratarte y dormir bien."
+            : `Recuperación baja (${recoveryScore}%). Hoy ya toca descanso; aprovecha para recuperar.`,
+        },
+      };
+    }
+
+    const rescheduled = pickBestValid(rankPlans(office, fixed, todayIdx + 1, night, effort, exam, tail));
+    const nextArr = rescheduled ? rescheduled.arr.slice() : arr.slice();
+    const recommendedCode = biometricsOff ? null : "low";
+    nextArr[todayIdx] = recommendedCode;
+
+    const movedToIdx = nextArr.findIndex((r, idx) => idx > todayIdx && r === originalCode);
+    const movedToDate = movedToIdx > todayIdx ? keys[movedToIdx] : null;
+    const origName = routineById(originalCode).name;
+    const movedText = movedToIdx > todayIdx
+      ? ` y movimos ${origName} al ${DAYS_LONG[movedToIdx].toLowerCase()}`
+      : ` y pospusimos ${origName} para más adelante`;
+
+    const reason = biometricsOff
+      ? `Señales biométricas fuera de rango${recoveryScore != null ? ` (recuperación ${recoveryScore}%)` : ""}. Cambiamos hoy por descanso activo${movedText}.`
+      : `Recuperación baja (${recoveryScore}%). Adaptamos hoy a Modo Baja Energía${movedText}.`;
+
+    return {
+      arr: nextArr,
+      bevelAdjustment: {
+        ...baseMeta,
+        applied: true,
+        action: biometricsOff ? "rest" : "swap_low",
+        originalCode,
+        recommendedCode,
+        movedToIdx: movedToIdx > todayIdx ? movedToIdx : null,
+        movedToDate,
+        reason,
+      },
+    };
+  }
+
+  // 2. Recuperación media (34–66%): mantener sesiones clave, evitar apilar días exigentes seguidos si hay margen.
+  if (zone === "mid") {
+    if (!originalCode || !MAIN.includes(originalCode)) {
+      return {
+        arr,
+        bevelAdjustment: {
+          ...baseMeta,
+          applied: false,
+          action: "keep_rest",
+          originalCode,
+          recommendedCode: originalCode,
+          reason: `Recuperación media (${recoveryScore}%). Hoy toca descanso; aprovecha para recargar.`,
+        },
+      };
+    }
+
+    const guidance = targetStrain
+      ? `Controla el RIR y mantén tu Strain entre ${targetStrain.min} y ${targetStrain.max}%.`
+      : "Controla el RIR y evita entrenar al fallo.";
+
+    if (hasBackToBackAt(arr, todayIdx, effort, tail)) {
+      const bevelOpts = { todayIdx, zone: "mid", biometricsOff: false };
+      const ranked = rankPlans(office, fixed, todayIdx, night, effort, exam, tail, bevelOpts);
+      const curMain = countMain(arr);
+      const cand = ranked.find((p) => (
+        p.score < 900
+        && countMain(p.arr) >= curMain
+        && !hasBackToBackAt(p.arr, todayIdx, effort, tail)
+      ));
+
+      if (cand && cand.arr.join() !== arr.join()) {
+        const nextArr = cand.arr.slice();
+        const movedToIdx = nextArr.findIndex((r, idx) => idx > todayIdx && r === originalCode);
+        const recommendedCode = nextArr[todayIdx] || null;
+        return {
+          arr: nextArr,
+          bevelAdjustment: {
+            ...baseMeta,
+            applied: true,
+            action: "unstack",
+            originalCode,
+            recommendedCode,
+            movedToIdx: movedToIdx > todayIdx ? movedToIdx : null,
+            movedToDate: movedToIdx > todayIdx ? keys[movedToIdx] : null,
+            reason: `Recuperación media (${recoveryScore}%). Separamos días exigentes seguidos para repartir mejor la carga sin perder sesiones.`,
+            guidance,
+          },
+        };
+      }
+    }
+
+    return {
+      arr,
+      bevelAdjustment: {
+        ...baseMeta,
+        applied: false,
+        action: "control_effort",
+        originalCode,
+        recommendedCode: originalCode,
+        reason: `Recuperación media (${recoveryScore}%). Mantén ${routineById(originalCode).name} cuidando la intensidad. ${guidance}`,
+        guidance,
+      },
+    };
+  }
+
+  // 3. Recuperación alta (67–100%): favorecer sesión de mayor prioridad/carga si había una diferida o una más exigente pendiente.
+  const hasDeferred = arr.some((r, i) => r && MAIN.includes(r) && i < todayIdx && !fixed[i])
+    || MAIN.some((m) => !arr.includes(m) && !Object.values(fixed || {}).includes(m));
+  const todayPrio = originalCode ? (SESSION_PRIORITY[originalCode] || 0) : 0;
+  const hasHigherLater = arr.some((r, i) => i > todayIdx && !fixed[i] && (SESSION_PRIORITY[r] || 0) > todayPrio);
+
+  if ((hasDeferred || (originalCode && hasHigherLater)) && !(exam && exam[todayIdx] && !originalCode)) {
+    const bevelOpts = { todayIdx, zone: "high", biometricsOff: false };
+    const curScore = scorePlan(arr, office, night, effort, exam, tail, bevelOpts);
+    const curMain = countMain(arr);
+    const ranked = rankPlans(office, fixed, todayIdx, night, effort, exam, tail, bevelOpts);
+    const cand = ranked.find((p) => {
+      if (p.score >= 900 || countMain(p.arr) < curMain) return false;
+      const candToday = p.arr[todayIdx];
+      if (!candToday || !MAIN.includes(candToday)) return false;
+      if (hasDeferred && !originalCode) return true;
+      return (SESSION_PRIORITY[candToday] || 0) > todayPrio && p.score <= curScore;
+    });
+
+    if (cand && cand.arr.join() !== arr.join()) {
+      const nextArr = cand.arr.slice();
+      const recommendedCode = nextArr[todayIdx];
+      return {
+        arr: nextArr,
+        bevelAdjustment: {
+          ...baseMeta,
+          applied: true,
+          action: "prioritize",
+          originalCode,
+          recommendedCode,
+          reason: `Recuperación alta (${recoveryScore}%). Aprovechamos tu buen estado hoy para priorizar ${routineById(recommendedCode).name}.`,
+        },
+      };
+    }
+  }
+
+  return {
+    arr,
+    bevelAdjustment: {
+      ...baseMeta,
+      applied: false,
+      action: originalCode ? "ready_push" : "keep_rest",
+      originalCode,
+      recommendedCode: originalCode,
+      reason: originalCode
+        ? `Recuperación alta (${recoveryScore}%). Buen día para apretar en ${routineById(originalCode).name}${targetStrain ? ` (meta de Strain ${targetStrain.min}–${targetStrain.max}%)` : ""}.`
+        : `Recuperación alta (${recoveryScore}%). Hoy tienes descanso programado.`,
+    },
+  };
+}
+
 export function weekState(weekPlan, log, mk, workouts, calBusy, opts = {}) {
   const keys = Array.from({ length: 7 }, (_, i) => dkey(addDays(fromKey(mk), i)));
   const stored = (weekPlan || {})[mk];
@@ -139,17 +410,43 @@ export function weekState(weekPlan, log, mk, workouts, calBusy, opts = {}) {
     arr = stored.plan.map((r, i) => (r && !fixed[i] && !done.includes(r) ? r : null));
     Object.keys(fixed).forEach((i) => { arr[i] = fixed[i]; });
   } else arr = rankPlans(office, fixed, 0, night, effort, exam, tail)[0].arr;
-  return { keys, office, night, fixed, arr, fit, effort, fromFitbit, exam, tail };
+
+  const bevelInput = opts.bevelDay || opts.bevel || null;
+  let bevelAdjustment = null;
+  if (bevelInput) {
+    const today = opts.today || dkey();
+    const todayIdx = keys.indexOf(today);
+    const adjusted = applyBevelAdjustment({
+      arr,
+      keys,
+      office,
+      night,
+      fixed,
+      effort,
+      exam,
+      tail,
+      todayIdx,
+      bevel: bevelInput,
+    });
+    arr = adjusted.arr;
+    bevelAdjustment = adjusted.bevelAdjustment;
+  }
+
+  return { keys, office, night, fixed, arr, fit, effort, fromFitbit, exam, tail, bevelAdjustment };
 }
 
-export function useWeekPlan(log) {
+export function useWeekPlan(log, opts = {}) {
   const [weekPlan, setWeekPlan] = usePersisted("weekPlan", {});
   const [workouts] = usePersisted("workouts", []); // de Fitbit; solo lectura
   const [calBusy] = usePersisted("calBusy", null); // de Google Calendar; solo lectura
   const today = dkey();
   const mk = dkey(mondayOf(new Date()));
   const todayIdx = dayDiff(today, mk);
-  const ws = useMemo(() => weekState(weekPlan, log, mk, workouts, calBusy), [weekPlan, log, mk, workouts, calBusy]);
+  const bevel = opts && typeof opts === "object" ? (opts.bevelDay || opts.bevel || (opts.recovery ? opts : null)) : null;
+  const ws = useMemo(
+    () => weekState(weekPlan, log, mk, workouts, calBusy, bevel ? { bevel, today } : {}),
+    [weekPlan, log, mk, workouts, calBusy, bevel, today],
+  );
 
   const save = (all, office, plan, night) => pruneDays({ ...(all || {}), [mk]: { office, plan, night } }, 8);
   // Reacomodar: recoloca lo pendiente de hoy en adelante y, en cada toque, pasa a la siguiente mejor opción.
@@ -175,7 +472,9 @@ export function useWeekPlan(log) {
     const i = dayDiff(dateKey, m);
     const rid = w.arr[i] || null;
     const evening = !!rid && isEvening(w.office, w.night, i);
-    return { date: dateKey, office: !!w.office[i], night: !!w.night[i], rid, evening, wake: rid && !evening ? "6:30" : "7:00", exam: !!(w.exam && w.exam[i]) };
+    const base = { date: dateKey, office: !!w.office[i], night: !!w.night[i], rid, evening, wake: rid && !evening ? "6:30" : "7:00", exam: !!(w.exam && w.exam[i]) };
+    if (dateKey === today && w.bevelAdjustment) base.bevelAdjustment = w.bevelAdjustment;
+    return base;
   };
   const info = (dateKey) => {
     const m = dkey(mondayOf(fromKey(dateKey)));
