@@ -48,7 +48,7 @@ export function StatusDot({ tone = "muted", children }) {
 
 // Botones: primary = degradado ámbar con sombra; ghost = vidrio; soft-<tono> = fondo tenue del tono.
 export const btnCls = (variant = "primary", extra = "") => {
-  const base = "inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl px-5 text-[15px] font-semibold transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40";
+  const base = "inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl px-5 text-[15px] font-semibold transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 [&_svg]:shrink-0";
   const v = {
     primary: "bg-gradient-to-b from-[#f3c582] to-[#e2a95a] text-accentInk shadow-[0_8px_24px_rgb(232_181_110/.3)] hover:brightness-105",
     ghost: "bg-white/[0.08] text-fg hover:bg-white/[0.12]",

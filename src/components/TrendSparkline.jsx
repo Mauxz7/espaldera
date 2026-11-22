@@ -69,10 +69,10 @@ export function RangeMiniBar({ value, range, status, polarity = "higherGood", ta
   }
 
   return (
-    <div className={`relative w-full overflow-hidden rounded-full bg-surface2 ${trackCls}`} aria-hidden="true">
+    <div className={`relative w-full overflow-hidden rounded-full bg-white/[0.08] ${trackCls}`} aria-hidden="true">
       {hasRange && (
         <div
-          className="absolute inset-y-0 border-x border-good/55 bg-good/25"
+          className="absolute inset-y-0 border-x border-good/50 bg-good/25"
           style={{ left: "30%", width: "40%" }}
         />
       )}

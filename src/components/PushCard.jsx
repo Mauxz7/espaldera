@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BellRing, BellOff, Smartphone, Loader2 } from "lucide-react";
 import { useSyncStatus } from "../lib/storage.js";
 import { pushSupported, isStandalone, isIOS, currentSubscription, enablePush, disablePush } from "../lib/push.js";
+import { Card, SectionTitle, StatusDot, btnCls } from "./ui.jsx";
 
 const ERRORS = {
   "sin-sync": "Primero conecta la sincronización con GitHub (arriba): el aviso se guarda en tu repositorio privado.",
@@ -39,40 +40,42 @@ export function PushCard() {
   };
 
   return (
-    <section className="min-w-0 rounded-2xl border border-line bg-surface p-4">
-      <h2 className="mb-1 font-display text-lg font-semibold uppercase tracking-wide">Avisos con la app cerrada</h2>
-      <p className="text-sm text-muted">
-        Los hábitos con hora te avisan aunque Shift esté cerrada, cada hora hasta que los marques, de 6:00 a.m. a 11:45 p.m. Pueden llegar con unos minutos de retraso. Actívalo en cada dispositivo.
-      </p>
+    <div className="min-w-0">
+      <SectionTitle>Avisos con la app cerrada</SectionTitle>
+      <Card className="min-w-0">
+        <p className="text-sm text-muted">
+          Los hábitos con hora te avisan aunque Shift esté cerrada, cada hora hasta que los marques, de 6:00 a.m. a 11:45 p.m. Pueden llegar con unos minutos de retraso. Actívalo en cada dispositivo.
+        </p>
 
-      {needsInstall ? (
-        <div className="mt-3 flex items-start gap-2 rounded-xl bg-surface2 p-3 text-xs text-warn">
-          <Smartphone size={15} className="mt-0.5 shrink-0" />
-          <span>En iPhone y iPad solo funciona con la app instalada: en Safari toca Compartir → «Agregar a pantalla de inicio» y abre Shift desde ese ícono.</span>
-        </div>
-      ) : !supported ? (
-        <p className="mt-3 flex items-start gap-2 text-xs text-warn"><BellOff size={14} className="mt-0.5 shrink-0" />{ERRORS["no-soportado"]}</p>
-      ) : (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {state === "on" ? (
-            <>
-              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-good"><BellRing size={15} />Activos en este dispositivo</span>
-              <button onClick={() => run(disablePush, "off")} className="rounded-xl bg-surface2 px-3 py-1.5 text-xs text-muted hover:text-fg">Desactivar</button>
-            </>
-          ) : (
-            <button
-              onClick={() => run(enablePush, "on")}
-              disabled={state !== "off" || sync.state === "off"}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-2 text-sm font-semibold text-accentInk disabled:opacity-40"
-            >
-              {state === "busy" || state === "checking" ? <Loader2 size={15} className="animate-spin" /> : <BellRing size={15} />}
-              Activar en este dispositivo
-            </button>
-          )}
-        </div>
-      )}
-      {supported && !needsInstall && sync.state === "off" && state !== "on" && <p className="mt-2 text-[11px] text-muted">{ERRORS["sin-sync"]}</p>}
-      {error && <p className="mt-2 text-xs text-warn">{error}</p>}
-    </section>
+        {needsInstall ? (
+          <div className="mt-3 flex items-start gap-2 rounded-2xl bg-warn/12 p-3 text-xs text-warn">
+            <Smartphone size={15} className="mt-0.5 shrink-0" />
+            <span>En iPhone y iPad solo funciona con la app instalada: en Safari toca Compartir → «Agregar a pantalla de inicio» y abre Shift desde ese ícono.</span>
+          </div>
+        ) : !supported ? (
+          <p className="mt-3 flex items-start gap-2 text-xs text-warn"><BellOff size={14} className="mt-0.5 shrink-0" />{ERRORS["no-soportado"]}</p>
+        ) : (
+          <div className="mt-3 flex flex-wrap items-center gap-2.5">
+            {state === "on" ? (
+              <>
+                <StatusDot tone="good">Activos en este dispositivo</StatusDot>
+                <button onClick={() => run(disablePush, "off")} className={btnCls("ghost", "min-h-[40px] px-3.5 text-xs text-muted")}>Desactivar</button>
+              </>
+            ) : (
+              <button
+                onClick={() => run(enablePush, "on")}
+                disabled={state !== "off" || sync.state === "off"}
+                className={btnCls("ghost", "min-h-[44px] bg-accent/15 px-4 text-sm text-accent hover:bg-accent/25")}
+              >
+                {state === "busy" || state === "checking" ? <Loader2 size={15} className="animate-spin" /> : <BellRing size={15} />}
+                Activar en este dispositivo
+              </button>
+            )}
+          </div>
+        )}
+        {supported && !needsInstall && sync.state === "off" && state !== "on" && <p className="mt-2 text-xs text-muted">{ERRORS["sin-sync"]}</p>}
+        {error && <p className="mt-2 text-xs text-warn">{error}</p>}
+      </Card>
+    </div>
   );
 }

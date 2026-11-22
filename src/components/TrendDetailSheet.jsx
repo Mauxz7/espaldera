@@ -3,7 +3,7 @@ import { ResponsiveContainer, ComposedChart, Line, XAxis, YAxis, CartesianGrid, 
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { TREND_WINDOWS } from "../lib/metrics.js";
 import { fmtShort } from "../lib/dates.js";
-import { Chip } from "./ui.jsx";
+import { StatusDot } from "./ui.jsx";
 import { SheetDialog } from "./SheetDialog.jsx";
 import { RangeMiniBar, trendPill, deltaClass } from "./TrendSparkline.jsx";
 import { formatDayLabel } from "./HealthRings.jsx";
@@ -98,17 +98,17 @@ export function TrendDetailSheet({
     >
       <div className="space-y-4">
         {/* Valor actual, estado y minibarra de rango */}
-        <section className="rounded-2xl border border-line bg-surface2/60 p-3.5">
+        <section className="rounded-2xl bg-white/[0.06] p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-baseline gap-1.5">
-              <span className="font-display text-4xl font-semibold leading-none text-fg tabular-nums">
+              <span className="font-mono text-4xl font-bold leading-none text-fg tabular-nums">
                 {metric.fmtValue(card.value)}
               </span>
               {card.value != null && metric.unit && (
                 <span className="text-xs font-medium text-muted">{metric.unit}</span>
               )}
             </div>
-            <Chip tone={pill.tone}>{pill.text}</Chip>
+            <StatusDot tone={pill.tone === "plain" ? "muted" : pill.tone}>{pill.text}</StatusDot>
           </div>
           <div className="mt-3">
             <RangeMiniBar
@@ -123,9 +123,9 @@ export function TrendDetailSheet({
         </section>
 
         {/* Sparkline con banda normal */}
-        <section className="rounded-2xl border border-line bg-surface2/30 p-3.5">
+        <section className="rounded-2xl bg-white/[0.05] p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-display text-sm font-semibold uppercase tracking-wide text-fg">
+            <h3 className="text-[15px] font-bold tracking-tight text-fg">
               Últimos {windowDays} días
             </h3>
             {hasRange && (
@@ -202,16 +202,16 @@ export function TrendDetailSheet({
         </section>
 
         {/* Tabla de cambios 3 / 7 / 14 / 30 / 90 días */}
-        <section className="rounded-2xl border border-line bg-surface2/30 p-3.5">
-          <h3 id={changesTitleId} className="mb-2 font-display text-sm font-semibold uppercase tracking-wide text-fg">
+        <section className="rounded-2xl bg-white/[0.05] p-4">
+          <h3 id={changesTitleId} className="mb-2 text-[15px] font-bold tracking-tight text-fg">
             Cambios del promedio móvil (7 d)
           </h3>
           <div tabIndex={0} role="region" aria-labelledby={changesTitleId} className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-line text-[11px] uppercase tracking-wider text-muted">
-                  <th scope="col" className="py-2 text-left font-semibold">Ventana</th>
-                  <th scope="col" className="py-2 text-right font-semibold">Cambio</th>
+                <tr className="border-b border-line text-[13px] font-medium text-muted">
+                  <th scope="col" className="py-2 text-left font-medium">Ventana</th>
+                  <th scope="col" className="py-2 text-right font-medium">Cambio</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">

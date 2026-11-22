@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Wind, HeartPulse, Activity, Droplets, Thermometer, Moon, Zap, ChevronRight } from "lucide-react";
 import { trendCard, seriesOf, dailyStress } from "../lib/metrics.js";
-import { Chip } from "./ui.jsx";
+import { Card, SectionTitle, StatusDot } from "./ui.jsx";
 import { RangeMiniBar, MiniSparkline, trendPill } from "./TrendSparkline.jsx";
 import { TrendDetailSheet } from "./TrendDetailSheet.jsx";
 
@@ -107,8 +107,8 @@ const MONITOR_METRICS = [
     unit: "",
     polarity: "higherGood",
     icon: Moon,
-    accent: "text-cool",
-    stroke: "var(--cool)",
+    accent: "text-sleep",
+    stroke: "rgb(var(--c-sleep))",
     fmtValue: fmtHMShort,
     fmtRange: (r) => (r ? `${fmtHMShort(r.low)}–${fmtHMShort(r.high)}` : "—"),
     fmtDelta: fmtSleepDelta,
@@ -122,8 +122,8 @@ const STRESS_METRIC = {
   unit: "pts",
   polarity: "lowerGood",
   icon: Zap,
-  accent: "text-accent",
-  stroke: "var(--accent)",
+  accent: "text-strain",
+  stroke: "rgb(var(--c-strain))",
   fmtValue: (v) => (typeof v === "number" && Number.isFinite(v) ? String(Math.round(v)) : "—"),
   fmtRange: (r) => (r ? `${Math.round(r.low)}–${Math.round(r.high)} pts` : "—"),
   fmtDelta: (d) => fmtSigned(d, 1, "pts"),
@@ -197,17 +197,12 @@ export function HealthMonitor({ vitals, sleep, bevelHistory, selectedDate, today
   const hasStressScore = typeof stress.score === "number" && Number.isFinite(stress.score);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Monitor de salud: cuadrícula 2 columnas */}
-      <section className="space-y-2.5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="font-display text-lg font-semibold uppercase tracking-wide text-fg">
-            Monitor de salud
-          </h2>
-          <span className="text-[11px] text-muted">Toca para ver 30 d</span>
-        </div>
+      <section>
+        <SectionTitle aside="Toca para ver 30 d">Monitor de salud</SectionTitle>
 
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {MONITOR_METRICS.map((m) => {
             const Icon = m.icon;
             const card = cards[m.id];
@@ -224,25 +219,25 @@ export function HealthMonitor({ vitals, sleep, bevelHistory, selectedDate, today
                 key={m.id}
                 type="button"
                 onClick={() => setOpenDetail({ metric: m, card })}
-                className="flex min-w-0 flex-col justify-between gap-2 rounded-2xl border border-line bg-surface p-3 text-left transition hover:border-accent/50 hover:bg-surface2/40 active:scale-[0.99]"
+                className="card flex min-w-0 flex-col justify-between gap-2.5 p-3.5 text-left transition hover:bg-white/[0.09] active:scale-[0.99]"
               >
                 <div className="flex items-center justify-between gap-1.5">
-                  <span className="truncate text-xs font-semibold text-muted">{m.label}</span>
-                  <Icon size={15} className={`shrink-0 ${m.accent}`} aria-hidden="true" />
+                  <span className="truncate text-[13px] font-medium text-muted">{m.label}</span>
+                  <Icon size={16} className={`shrink-0 ${m.accent}`} aria-hidden="true" />
                 </div>
 
                 <div className="flex flex-wrap items-baseline gap-1">
-                  <span className="font-display text-2xl font-semibold leading-none text-fg tabular-nums sm:text-3xl">
+                  <span className="font-mono text-[28px] font-bold leading-none text-fg tabular-nums sm:text-3xl">
                     {m.fmtValue(card.value)}
                   </span>
                   {hasVal && m.unit && (
-                    <span className="text-[11px] font-medium text-muted">{m.unit}</span>
+                    <span className="text-xs font-medium text-muted">{m.unit}</span>
                   )}
                 </div>
 
                 <div className="space-y-1.5">
                   <div className="min-w-0">
-                    <Chip tone={pill.tone}>{pill.text}</Chip>
+                    <StatusDot tone={pill.tone === "plain" ? "muted" : pill.tone}>{pill.text}</StatusDot>
                   </div>
                   <RangeMiniBar
                     value={card.value}
@@ -250,7 +245,7 @@ export function HealthMonitor({ vitals, sleep, bevelHistory, selectedDate, today
                     status={card.status}
                     polarity={m.polarity}
                   />
-                  <div className="truncate font-mono text-[10px] text-muted tabular-nums">
+                  <div className="truncate font-mono text-[11px] text-muted tabular-nums">
                     {rangeHint}
                   </div>
                 </div>
@@ -261,75 +256,77 @@ export function HealthMonitor({ vitals, sleep, bevelHistory, selectedDate, today
       </section>
 
       {/* Tarjeta Estrés diario */}
-      <button
-        type="button"
-        onClick={() => setOpenDetail({ metric: STRESS_METRIC, card: stressTrend })}
-        className="block w-full min-w-0 rounded-2xl border border-line bg-surface p-3.5 text-left transition hover:border-accent/50 hover:bg-surface2/40 active:scale-[0.99] sm:p-4"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Zap size={16} className={stressLevelMeta.textCls} aria-hidden="true" />
-            <h2 className="font-display text-base font-semibold uppercase tracking-wide text-fg">
-              Estrés
-            </h2>
+      <div>
+        <SectionTitle>Estrés</SectionTitle>
+        <Card
+          as="button"
+          type="button"
+          onClick={() => setOpenDetail({ metric: STRESS_METRIC, card: stressTrend })}
+          className="block w-full min-w-0 text-left transition hover:bg-white/[0.09] active:scale-[0.99]"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Zap size={16} className={stressLevelMeta.textCls} aria-hidden="true" />
+              <span className="text-sm font-semibold text-fg">Carga de estrés diario</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <StatusDot tone={stressLevelMeta.tone === "plain" ? "muted" : stressLevelMeta.tone}>{stressLevelMeta.label}</StatusDot>
+              <ChevronRight size={15} className="text-muted" aria-hidden="true" />
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Chip tone={stressLevelMeta.tone}>{stressLevelMeta.label}</Chip>
-            <ChevronRight size={15} className="text-muted" aria-hidden="true" />
-          </div>
-        </div>
 
-        <div className="mt-2.5 flex flex-wrap items-end justify-between gap-3">
-          <div className="flex items-baseline gap-1.5">
-            <span className={`font-display text-3xl font-semibold leading-none tabular-nums ${stressLevelMeta.textCls}`}>
-              {hasStressScore ? stress.score : "—"}
-            </span>
-            <span className="font-mono text-xs text-muted">/ 100</span>
-            {typeof stress.sleepScore === "number" && Number.isFinite(stress.sleepScore) && (
-              <span className="ml-2 font-mono text-[11px] text-muted tabular-nums">
-                Nocturno {stress.sleepScore}
+          <div className="mt-2.5 flex flex-wrap items-end justify-between gap-3">
+            <div className="flex items-baseline gap-1.5">
+              <span className={`font-mono text-3xl font-bold leading-none tabular-nums ${stressLevelMeta.textCls}`}>
+                {hasStressScore ? stress.score : "—"}
               </span>
+              <span className="font-mono text-xs text-muted">/ 100</span>
+              {typeof stress.sleepScore === "number" && Number.isFinite(stress.sleepScore) && (
+                <span className="ml-2 font-mono text-[11px] text-muted tabular-nums">
+                  Nocturno {stress.sleepScore}
+                </span>
+              )}
+            </div>
+
+            <div className="w-28 shrink-0 sm:w-36">
+              <MiniSparkline
+                spark={stressTrend.spark}
+                range={stressTrend.range}
+                stroke="rgb(var(--c-strain))"
+                height={32}
+              />
+            </div>
+          </div>
+
+          {/* Barra de 3 niveles: bajo (<30), medio (30-60), alto (>60) */}
+          <div className="relative mt-3 flex h-2 w-full overflow-hidden rounded-full bg-white/[0.07]" aria-hidden="true">
+            <div className="h-full bg-good/30" style={{ width: "30%" }} />
+            <div className="h-full border-x border-surface bg-accent/30" style={{ width: "30%" }} />
+            <div className="h-full bg-warn/30" style={{ width: "40%" }} />
+            {hasStressScore && (
+              <span
+                className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg ring-2 ring-surface"
+                style={{ left: `${Math.max(3, Math.min(97, stress.score))}%` }}
+              />
             )}
           </div>
 
-          <div className="w-28 shrink-0 sm:w-36">
-            <MiniSparkline
-              spark={stressTrend.spark}
-              range={stressTrend.range}
-              stroke="var(--accent)"
-              height={32}
-            />
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+            {hasStressScore ? (
+              <>
+                <span>Tendencia: {stressTrendPill.text}</span>
+                <span className="font-mono tabular-nums">
+                  {typeof stressTrend.changes?.d7 === "number" && Number.isFinite(stressTrend.changes.d7)
+                    ? `7 d: ${fmtSigned(stressTrend.changes.d7, 1, "pts")}`
+                    : "Bandas <30 bajo · 30–60 medio · >60 alto"}
+                </span>
+              </>
+            ) : (
+              <span>Necesita FC despierto y FC en reposo de Fitbit para calcular el puntaje diario.</span>
+            )}
           </div>
-        </div>
-
-        {/* Barra de 3 niveles: bajo (<30), medio (30-60), alto (>60) */}
-        <div className="relative mt-3 flex h-2 w-full overflow-hidden rounded-full bg-surface2" aria-hidden="true">
-          <div className="h-full bg-good/30" style={{ width: "30%" }} />
-          <div className="h-full border-x border-surface bg-accent/30" style={{ width: "30%" }} />
-          <div className="h-full bg-warn/30" style={{ width: "40%" }} />
-          {hasStressScore && (
-            <span
-              className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg ring-2 ring-surface"
-              style={{ left: `${Math.max(3, Math.min(97, stress.score))}%` }}
-            />
-          )}
-        </div>
-
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted">
-          {hasStressScore ? (
-            <>
-              <span>Tendencia: {stressTrendPill.text}</span>
-              <span className="font-mono tabular-nums">
-                {typeof stressTrend.changes?.d7 === "number" && Number.isFinite(stressTrend.changes.d7)
-                  ? `7 d: ${fmtSigned(stressTrend.changes.d7, 1, "pts")}`
-                  : "Bandas <30 bajo · 30–60 medio · >60 alto"}
-              </span>
-            </>
-          ) : (
-            <span>Necesita FC despierto y FC en reposo de Fitbit para calcular el puntaje diario.</span>
-          )}
-        </div>
-      </button>
+        </Card>
+      </div>
 
       {openDetail && (
         <TrendDetailSheet
