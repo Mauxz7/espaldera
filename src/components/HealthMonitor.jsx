@@ -204,7 +204,7 @@ export function HealthMonitor({ vitals, sleep, bevelHistory, selectedDate, today
           <h2 className="font-display text-lg font-semibold uppercase tracking-wide text-fg">
             Monitor de salud
           </h2>
-          <span className="text-[11px] text-muted">Toca una métrica para ver tendencia 30 d</span>
+          <span className="text-[11px] text-muted">Toca para ver 30 d</span>
         </div>
 
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3">

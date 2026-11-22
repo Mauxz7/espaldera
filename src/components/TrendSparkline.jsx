@@ -90,7 +90,11 @@ export function RangeMiniBar({ value, range, status, polarity = "higherGood", ta
  * Sparkline compacto en SVG con banda normal opcional.
  */
 export function MiniSparkline({ spark = [], range = null, stroke = "var(--accent)", height = 34, ariaLabel }) {
-  const points = Array.isArray(spark) ? spark : [];
+  // Recorta los días vacíos del inicio: con pocas semanas de datos, una ventana de 90 d
+  // dejaba la línea apretada contra el borde derecho.
+  const rawPoints = Array.isArray(spark) ? spark : [];
+  const firstIdx = rawPoints.findIndex((p) => p && typeof p.value === "number" && Number.isFinite(p.value));
+  const points = firstIdx > 0 ? rawPoints.slice(firstIdx) : rawPoints;
   const nums = [];
   for (const p of points) {
     if (p && typeof p.value === "number" && Number.isFinite(p.value)) nums.push(p.value);
