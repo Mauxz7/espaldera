@@ -7,7 +7,11 @@ import http from "node:http";
 import crypto from "node:crypto";
 import readline from "node:readline";
 import { spawnSync } from "node:child_process";
-import { SCOPES, fetchExercises, fetchSleep, toSleep } from "./google-health.mjs";
+import { pathToFileURL } from "node:url";
+import { SCOPES, fetchExercises, fetchSleep, toSleep, fetchVitals } from "./google-health.mjs";
+
+// Fitbit (actividad, ejercicio, sueño y signos vitales): se mantiene separado de Calendar.
+export const FITBIT_SCOPES = SCOPES;
 
 // Calendario (Fase 7): crear y editar solo el calendario «Shift» que hace la app + leer eventos para sugerir noches ocupadas y exámenes.
 // Va en un token APARTE: la Google Health API rechaza tokens que traen otros permisos (DISALLOWED_OAUTH_SCOPES).
@@ -99,19 +103,30 @@ async function authorize(clientId, clientSecret, scope, mustInclude, what) {
 }
 
 async function healthStep(clientId, clientSecret) {
-  const tok = await authorize(clientId, clientSecret, SCOPES, "googlehealth.activity_and_fitness", "actividad, ejercicio y sueño (Fitbit)");
+  const tok = await authorize(clientId, clientSecret, SCOPES, "googlehealth.activity_and_fitness", "actividad, ejercicio, sueño y signos vitales (Fitbit)");
   // Prueba real antes de guardar: ¿la API responde con tus entrenos?
   const since = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   const points = await fetchExercises(fetch, tok.access_token, since);
   console.log(`\nGoogle Health respondió: ${points.length} entrenos en los últimos 30 días.`);
+  let sleepPoints = [];
   try {
-    const nights = (await fetchSleep(fetch, tok.access_token, since)).map(toSleep).filter(Boolean);
+    sleepPoints = await fetchSleep(fetch, tok.access_token, since);
+    const nights = sleepPoints.map(toSleep).filter(Boolean);
     console.log(`Sueño: ${nights.length} noches en los últimos 30 días.`);
   } catch (e) {
     const why = e.status === 403
       ? "sin permiso (¿quedó sin marcar la casilla de sueño?). Puedes repetir con --solo-fitbit."
       : e.message;
     console.log(`Sueño: ${why} Los entrenos funcionan igual.`);
+  }
+  try {
+    const vitalsSince = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const { vitals, warnings } = await fetchVitals(fetch, tok.access_token, vitalsSince, { sleepPoints });
+    const days = Object.keys(vitals).length;
+    const denied = warnings.some((w) => w.status === 403);
+    console.log(`Signos vitales: ${days} días en los últimos 7 días.${denied ? " Sin permiso completo (¿quedó sin marcar la casilla de métricas de salud?). Puedes repetir con --solo-fitbit." : ""}`);
+  } catch (e) {
+    console.log(`Signos vitales: ${e.message} Los entrenos funcionan igual.`);
   }
   setSecret("GOOGLE_HEALTH_CLIENT_ID", clientId);
   setSecret("GOOGLE_HEALTH_CLIENT_SECRET", clientSecret);
@@ -151,7 +166,9 @@ async function main() {
   console.log("\nTodo listo.");
 }
 
-main().catch((e) => {
-  console.error(`\n✗ ${e.message}`);
-  process.exit(1);
-});
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+  main().catch((e) => {
+    console.error(`\n✗ ${e.message}`);
+    process.exit(1);
+  });
+}

@@ -144,3 +144,73 @@ test("lastWeeks devuelve 8 semanas seguidas con ceros donde no hubo entrenos", a
   assert.equal(weeks.find((w) => w.weekStart === "2026-10-19").walk, 40);
   assert.equal(weeks.filter((w) => w.count === 0).length, 6);
 });
+
+test("normalizeWorkout conserva y sanitiza avgHr, azm, kcal, zones, source y km con retrocompatibilidad", () => {
+  const start = localIso(2026, 11, 21, 7, 30);
+  const end = localIso(2026, 11, 21, 8, 10);
+
+  // Entreno clásico sin campos opcionales: no añade claves extra
+  const legacy = normalizeWorkout({ id: "w1", type: "Correr", kind: "run", start, end, min: 40 });
+  assert.equal("avgHr" in legacy, false);
+  assert.equal("azm" in legacy, false);
+  assert.equal("kcal" in legacy, false);
+  assert.equal("zones" in legacy, false);
+  assert.equal("source" in legacy, false);
+  assert.equal("km" in legacy, false);
+
+  // Entreno enriquecido válido
+  const enriched = normalizeWorkout({
+    id: "w2",
+    type: "Correr",
+    kind: "run",
+    start,
+    end,
+    min: 38,
+    source: "google",
+    km: 5.412,
+    avgHr: 152.4,
+    azm: "44",
+    kcal: 360.6,
+    zones: { light: 8, moderate: 14, vigorous: 13.44, peak: 3 },
+  });
+  assert.equal(enriched.source, "google");
+  assert.equal(enriched.km, 5.41);
+  assert.equal(enriched.avgHr, 152);
+  assert.equal(enriched.azm, 44);
+  assert.equal(enriched.kcal, 361);
+  assert.deepEqual(enriched.zones, { light: 8, moderate: 14, vigorous: 13.4, peak: 3 });
+
+  // Valores inválidos en campos opcionales se omiten sin descartar el entreno
+  const dirty = normalizeWorkout({
+    id: "w3",
+    type: "Fuerza",
+    kind: "strength",
+    start,
+    min: 45,
+    avgHr: -10,
+    azm: "abc",
+    kcal: false,
+    km: 0,
+    zones: { light: 0, moderate: -5, vigorous: "x", peak: null },
+  });
+  assert.ok(dirty);
+  assert.equal(dirty.id, "w3");
+  assert.equal("avgHr" in dirty, false);
+  assert.equal("azm" in dirty, false);
+  assert.equal("kcal" in dirty, false);
+  assert.equal("km" in dirty, false);
+  assert.equal("zones" in dirty, false);
+
+  // azm = 0 es válido y se conserva; zonas parciales rellenan faltantes con 0
+  const partial = normalizeWorkout({
+    id: "w4",
+    type: "Caminata",
+    kind: "walk",
+    start,
+    min: 20,
+    azm: 0,
+    zones: { light: 12 },
+  });
+  assert.equal(partial.azm, 0);
+  assert.deepEqual(partial.zones, { light: 12, moderate: 0, vigorous: 0, peak: 0 });
+});

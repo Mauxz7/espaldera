@@ -10,6 +10,28 @@ export const KIND_LABELS = {
   other: "Otro",
 };
 
+function optNumber(v, { min = 0, strictPositive = false } = {}) {
+  if (v === null || v === undefined || v === "" || typeof v === "boolean") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  if (strictPositive ? n <= min : n < min) return null;
+  return n;
+}
+
+function sanitizeZones(z) {
+  if (!z || typeof z !== "object" || Array.isArray(z)) return null;
+  const out = { light: 0, moderate: 0, vigorous: 0, peak: 0 };
+  let total = 0;
+  for (const k of ["light", "moderate", "vigorous", "peak"]) {
+    const n = optNumber(z[k], { min: 0 });
+    if (n !== null) {
+      out[k] = Math.round(n * 10) / 10;
+      total += out[k];
+    }
+  }
+  return total > 0 ? out : null;
+}
+
 /**
  * Valida y normaliza un entreno individual.
  * Devuelve null si la entrada no es un objeto válido o no tiene una fecha de inicio válida.
@@ -37,7 +59,7 @@ export function normalizeWorkout(w) {
   const date = dkey(startDate);
   const weekStart = dkey(mondayOf(startDate));
 
-  return {
+  const out = {
     id: w.id || `${startDate.toISOString().slice(0, 16)}-${kind}`,
     type,
     kind,
@@ -47,6 +69,20 @@ export function normalizeWorkout(w) {
     date,
     weekStart,
   };
+
+  if (typeof w.source === "string" && w.source.trim()) out.source = w.source.trim();
+  const km = optNumber(w.km, { strictPositive: true });
+  if (km !== null) out.km = Math.round(km * 100) / 100;
+  const avgHr = optNumber(w.avgHr, { strictPositive: true });
+  if (avgHr !== null) out.avgHr = Math.round(avgHr);
+  const azm = optNumber(w.azm, { min: 0 });
+  if (azm !== null) out.azm = Math.round(azm);
+  const kcal = optNumber(w.kcal, { strictPositive: true });
+  if (kcal !== null) out.kcal = Math.round(kcal);
+  const zones = sanitizeZones(w.zones);
+  if (zones) out.zones = zones;
+
+  return out;
 }
 
 /**

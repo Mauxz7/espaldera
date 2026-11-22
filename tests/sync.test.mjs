@@ -97,3 +97,30 @@ test("routineVariants y skips se sincronizan entre dispositivos", async () => {
   assert.deepEqual(await b.read("routineVariants"), { d1: "trx", d4: "express" });
   assert.deepEqual(await b.read("skips"), { "2026-11-21": { d4: { d4c1: true } } });
 });
+
+test("SYNC_KEYS incluye vitals y healthPrefs con retrocompatibilidad cuando faltan", async () => {
+  const { SYNC_KEYS } = await import("../src/lib/storage.js");
+  assert.ok(SYNC_KEYS.includes("vitals"));
+  assert.ok(SYNC_KEYS.includes("healthPrefs"));
+
+  // Retrocompatibilidad: un dispositivo sincroniza un data.json previo sin vitals ni healthPrefs
+  const oldDev = await device("l");
+  await oldDev.sync();
+  assert.equal(await oldDev.read("vitals"), undefined);
+  assert.equal(await oldDev.read("healthPrefs"), undefined);
+  assert.equal((await oldDev.status()).state, "ok");
+
+  // Sincronización de vitals y healthPrefs entre dispositivos
+  const a = await device("m");
+  const b = await device("n");
+  const vitalsSample = {
+    "2026-11-21": { rhr: 53, hrv: 64.2, hrvKind: "rmssd", resp: 14.1, spo2: 97.5, tempDev: 0.1, src: "google" },
+  };
+  const prefsSample = { sleepBaseMin: 450, maxHr: null, age: null, hrvKind: "rmssd" };
+  await a.write("vitals", vitalsSample, 6000);
+  await a.write("healthPrefs", prefsSample, 6000);
+  await a.sync();
+  await b.sync();
+  assert.deepEqual(await b.read("vitals"), vitalsSample);
+  assert.deepEqual(await b.read("healthPrefs"), prefsSample);
+});
