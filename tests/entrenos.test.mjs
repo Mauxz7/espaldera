@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { classify, parseDuration, parseLine, parseInbox, mergeWorkouts, main } from "../scripts/entrenos.mjs";
+import { classify, parseDuration, parseLine, parseInbox, mergeWorkouts, applyWorkouts, main } from "../scripts/entrenos.mjs";
 
 test("classify reconoce los tipos en español e inglés", () => {
   assert.equal(classify("Correr"), "run");
@@ -81,4 +81,17 @@ test("main repone la clave workouts si un dispositivo viejo la borró de data.js
   const before = fs.statSync(path.join(root, "data.json")).mtimeMs;
   assert.equal(main({ root, now: new Date("2026-11-13T21:00:00Z") }).repaired, false);
   assert.equal(fs.statSync(path.join(root, "data.json")).mtimeMs, before);
+});
+
+test("applyWorkouts escribe data.json cuando un entreno ya conocido llega con pulso y zonas", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "espaldera-salud-"));
+  const now = new Date("2026-11-22T12:00:00Z");
+  const base = { id: "2026-11-21T19:05-strength", type: "Pesas", kind: "strength", start: "2026-11-21T19:05:27.000Z", end: null, min: 42, source: "google" };
+  fs.writeFileSync(path.join(root, "data.json"), JSON.stringify({ workouts: { v: [base], at: 1 } }));
+  const r = applyWorkouts({ root, incoming: [{ ...base, avgHr: 142, zones: { light: 4, moderate: 9, vigorous: 29, peak: 0 } }], now });
+  assert.equal(r.added, 0);
+  const data = JSON.parse(fs.readFileSync(path.join(root, "data.json"), "utf8"));
+  assert.equal(data.workouts.v[0].avgHr, 142);
+  assert.equal(data.workouts.v[0].zones.vigorous, 29);
+  assert.equal(data.workouts.at, now.getTime());
 });

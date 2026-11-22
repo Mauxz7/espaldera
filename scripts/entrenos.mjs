@@ -91,7 +91,10 @@ export function applyWorkouts({ root = process.cwd(), incoming = [], now = new D
   fs.writeFileSync(storePath, JSON.stringify(list, null, 1) + "\n");
   const inData = (data.workouts && data.workouts.v) || null;
   const repaired = !inData || inData.length !== list.length;
-  if (added > 0 || repaired) {
+  // También cuando un entreno ya conocido llega enriquecido (pulso, zonas, kcal):
+  // antes solo se escribía si había entrenos nuevos y la app nunca veía las zonas.
+  const changed = repaired || JSON.stringify(inData) !== JSON.stringify(list);
+  if (added > 0 || changed) {
     data.workouts = { v: list, at: now.getTime() };
     fs.writeFileSync(dataPath, JSON.stringify(data));
   }
