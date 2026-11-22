@@ -10,6 +10,7 @@ import { Chip } from "../components/ui.jsx";
 import { HealthRings } from "../components/HealthRings.jsx";
 import { HealthMonitor } from "../components/HealthMonitor.jsx";
 import { FitnessSection } from "../components/FitnessSection.jsx";
+import { BiomarkersSection } from "../components/BiomarkersSection.jsx";
 import { HealthSheets } from "../components/HealthSheets.jsx";
 
 const KIND_ICON = {
@@ -446,6 +447,12 @@ export function DashboardView({ health, setHealth, log, bevelHistory, vitals = {
               bevelHistory={bevelHistory}
               workouts={workouts}
               setLog={setLog}
+              selectedDate={selectedDate}
+              todayKey={todayKey}
+            />
+            <BiomarkersSection
+              vitals={vitals}
+              health={health}
               selectedDate={selectedDate}
               todayKey={todayKey}
             />
