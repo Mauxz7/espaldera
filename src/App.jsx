@@ -124,15 +124,15 @@ export default function App() {
 
   return (
     <div className="min-h-full md:flex">
-      <nav className="side-nav hidden md:flex md:w-56 md:shrink-0 md:flex-col md:gap-1 md:border-r md:border-line md:p-4 lg:w-64">
+      <nav className="side-nav hidden md:flex md:w-56 md:shrink-0 md:flex-col md:gap-1 md:border-r md:border-line md:bg-white/[0.02] md:p-4 lg:w-64">
         <div className="mb-6 px-2">
-          <div className="font-display text-2xl font-semibold uppercase leading-none">Shift</div>
+          <div className="text-2xl font-bold leading-none tracking-tight">Shift</div>
           <div className="text-xs text-muted">Hábitos e identidad</div>
         </div>
         {TABS.map((t) => {
           const Icon = t.icon;
           return (
-            <button key={t.id} onClick={() => { if (t.id === "train") setTrainRid(null); setTab(t.id); }} aria-current={tab === t.id ? "page" : undefined} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${tab === t.id ? "bg-accent/15 text-accent" : "text-muted hover:bg-surface hover:text-fg"}`}>
+            <button key={t.id} onClick={() => { if (t.id === "train") setTrainRid(null); setTab(t.id); }} aria-current={tab === t.id ? "page" : undefined} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${tab === t.id ? "bg-white/[0.08] text-fg [&>svg]:text-accent" : "text-muted hover:bg-white/[0.05] hover:text-fg"}`}>
               <Icon size={18} />{t.label}
             </button>
           );
@@ -141,8 +141,8 @@ export default function App() {
       </nav>
 
       <main className="page-main min-w-0 flex-1">
-        <header className="mb-4 flex items-center justify-between md:hidden">
-          <div className="font-display text-xl font-semibold uppercase">Shift</div>
+        <header className="mb-3 flex items-center justify-between md:hidden">
+          <div className="text-[15px] font-bold tracking-tight text-muted">Shift</div>
           <SyncBadge />
         </header>
         <div className="mx-auto max-w-6xl">
@@ -155,15 +155,18 @@ export default function App() {
         </div>
       </main>
 
-      <nav className="bottom-nav fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-surface/95 backdrop-blur md:hidden">
-        {TABS.map((t) => {
-          const Icon = t.icon;
-          return (
-            <button key={t.id} onClick={() => { if (t.id === "train") setTrainRid(null); setTab(t.id); }} aria-current={tab === t.id ? "page" : undefined} className={`flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium ${tab === t.id ? "text-accent" : "text-muted"}`}>
-              <Icon size={21} />{t.label}
-            </button>
-          );
-        })}
+      <nav className="bottom-nav fixed inset-x-0 bottom-0 z-30 md:hidden">
+        <div className="mx-3 mb-2 grid grid-cols-5 rounded-[30px] border border-white/[0.08] bg-[rgb(30_35_46/.78)] px-1 py-1.5 shadow-[0_12px_40px_rgb(0_0_0/.5)] backdrop-blur-xl">
+          {TABS.map((t) => {
+            const Icon = t.icon;
+            const on = tab === t.id;
+            return (
+              <button key={t.id} onClick={() => { if (t.id === "train") setTrainRid(null); setTab(t.id); }} aria-current={on ? "page" : undefined} className={`flex flex-col items-center gap-0.5 rounded-[22px] py-1.5 text-[10.5px] font-semibold transition ${on ? "text-fg" : "text-faint"}`}>
+                <Icon size={21} className={on ? "text-accent" : ""} />{t.label}
+              </button>
+            );
+          })}
+        </div>
       </nav>
 
       <RestTimer timer={timer} setTimer={setTimer} />
