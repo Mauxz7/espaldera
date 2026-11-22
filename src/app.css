@@ -70,10 +70,6 @@ dialog.sheet-dialog { margin: auto auto 0 !important; }
 [role="tab"][aria-selected="true"]::after { content: ""; position: absolute; inset: auto 10px 0; border-block-end: 2px solid var(--accent); }
 @keyframes rise { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
 .flash { animation: flash 0.6s ease-in-out 4; }
-.creatine-banner { top: max(12px, env(safe-area-inset-top, 0px)); }
-@media (min-width: 768px) { .creatine-banner { top: auto; bottom: max(24px, env(safe-area-inset-bottom, 0px)); } }
-.ring-bell { animation: ring 0.9s ease-in-out 6; transform-origin: 50% 10%; }
-@keyframes ring { 0%,100% { transform: rotate(0); } 20% { transform: rotate(16deg); } 40% { transform: rotate(-14deg); } 60% { transform: rotate(10deg); } 80% { transform: rotate(-6deg); } }
 
 @keyframes flash { 50% { filter: brightness(1.35); transform: scale(1.03); } }
 .no-scrollbar { scrollbar-width: none; } .no-scrollbar::-webkit-scrollbar { display: none; }

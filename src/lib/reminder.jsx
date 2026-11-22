@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Check, Bell, BellRing, BellOff } from "lucide-react";
+import { Bell, BellRing, BellOff } from "lucide-react";
 import { dkey, hhmm } from "./dates.js";
-import { unlockAudio, beep } from "./audio.js";
-import { CREATINE_ID, DEFAULT_HABIT_DEFS, isHabitDoneOrMini, getHabitIcon } from "../data/habits.js";
+import { unlockAudio } from "./audio.js";
+import { CREATINE_ID, DEFAULT_HABIT_DEFS, isHabitDoneOrMini } from "../data/habits.js";
 
 export const CREATINE_HOUR = 12;
 export const REMINDER_STORAGE_KEY = "fitpanel:reminderFired";
@@ -188,7 +188,6 @@ export function useHabitReminders(habitDefsOrTaken = DEFAULT_HABIT_DEFS, habitsI
   const fire = useCallback(() => {
     setRinging(true);
     setHidden(false);
-    beep();
     if (notifPerm() === "granted") {
       try {
         if (notifRef.current) notifRef.current.close();
@@ -301,116 +300,18 @@ export function useHabitReminders(habitDefsOrTaken = DEFAULT_HABIT_DEFS, habitsI
 
 export const useCreatineReminder = useHabitReminders;
 
-export function ReminderBanner({ rem, onTake }) {
-  if (!rem || !rem.due || rem.hidden) return null;
-  const dueHabits =
-    Array.isArray(rem.dueHabits) && rem.dueHabits.length > 0
-      ? rem.dueHabits
-      : [DEFAULT_HABIT_DEFS[0]];
-  const dayHabits = rem.dayHabits || {};
-  const single = dueHabits.length === 1;
-
-  return (
-    <div className="creatine-banner fixed inset-x-0 z-40 flex justify-center px-4" role="alert">
-      <div
-        className={`w-full max-w-xl rounded-2xl border border-warn/50 bg-surface p-3 shadow-2xl ${
-          rem.ringing ? "flash" : ""
-        }`}
-      >
-        <div className="flex items-start justify-between gap-2.5">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-warn/20 text-warn">
-              <BellRing size={18} className={rem.ringing ? "ring-bell" : ""} />
-            </span>
-            <div className="min-w-0">
-              <div className="font-display text-lg font-semibold uppercase leading-none">
-                {single ? "Hábito pendiente" : `${dueHabits.length} hábitos pendientes`}
-              </div>
-              <div className="mt-0.5 text-xs text-muted">
-                {single
-                  ? `Desde las ${dueHabits[0].remindAt || "12:00"}. Te aviso cada hora en punto hasta que lo marques.`
-                  : "Te aviso cada hora en punto hasta que los marques."}
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => rem.setHidden(true)}
-            className="shrink-0 rounded-xl bg-surface2 px-2.5 py-1.5 text-xs text-muted hover:text-fg"
-            aria-label="Ocultar hasta el próximo aviso"
-          >
-            Ocultar
-          </button>
-        </div>
-
-        <ul className="mt-2.5 max-h-56 space-y-1.5 overflow-y-auto">
-          {dueHabits.map((hb) => {
-            const Icon = getHabitIcon(hb);
-            const cur = dayHabits[hb.id];
-            const count = typeof cur === "number" ? cur : 0;
-            const isCount = hb.kind === "count";
-            return (
-              <li
-                key={hb.id}
-                className="flex items-center justify-between gap-2.5 rounded-xl border border-line bg-surface2/80 px-2.5 py-2"
-              >
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-surface text-warn">
-                    <Icon size={15} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-fg">{hb.label}</div>
-                    {hb.after && hb.after.trim() && (
-                      <div className="truncate text-xs text-muted">{hb.after.trim()}</div>
-                    )}
-                    <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] text-muted">
-                      {hb.remindAt && (
-                        <span className="inline-flex items-center gap-0.5">
-                          <Bell size={9} />
-                          {hb.remindAt}
-                        </span>
-                      )}
-                      {isCount && (
-                        <span className="text-accent">
-                          {count}/{hb.target || 1}
-                          {hb.unit ? ` ${hb.unit}` : ""}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onTake && onTake(hb.id)}
-                  aria-label={`Marcar ${hb.label}`}
-                  className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1 rounded-xl bg-good px-3 py-1.5 text-xs font-semibold text-bg active:scale-95"
-                >
-                  <Check size={14} strokeWidth={3} />
-                  Marcar
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-export const CreatineBanner = ReminderBanner;
-
 export function ReminderCard({ rem, taken }) {
   const permText =
     {
       granted: { t: "Notificaciones del sistema activas.", cls: "text-good", icon: Bell },
       denied: {
-        t: "El navegador bloquea las notificaciones del sistema en esta vista. El aviso en pantalla, el sonido y el título que parpadea siguen funcionando.",
+        t: "El navegador bloquea las notificaciones del sistema en esta vista. Los avisos al celular llegan igual por push.",
         cls: "text-warn",
         icon: BellOff,
       },
       default: { t: "Aún no has dado permiso para notificaciones del sistema.", cls: "text-muted", icon: Bell },
       unsupported: {
-        t: "Este navegador no ofrece notificaciones aquí. El aviso en pantalla y el sonido siguen funcionando.",
+        t: "Este navegador no ofrece notificaciones aquí. Los avisos al celular llegan igual por push.",
         cls: "text-warn",
         icon: BellOff,
       },
@@ -445,7 +346,7 @@ export function ReminderCard({ rem, taken }) {
     <section className="rounded-2xl border border-line bg-surface p-4">
       <h2 className="mb-1 font-display text-lg font-semibold uppercase tracking-wide">Recordatorios de hábitos</h2>
       <p className="text-sm text-muted">
-        A partir de la hora configurada en cada hábito, si sigue pendiente, Shift te avisa cada hora en punto con notificación, sonido y aviso en pantalla. Se detiene apenas lo marcas.
+        A partir de la hora configurada en cada hábito, si sigue pendiente, Shift te manda una notificación al celular cada hora en punto. Dentro de la app no aparece ningún aviso; se detiene apenas lo marcas.
       </p>
       <div className={`mt-3 flex items-start gap-2 text-xs ${permText.cls}`}>
         <Icon size={14} className="mt-0.5 shrink-0" />
