@@ -304,7 +304,7 @@ export function WorkoutsSection({ workouts, log, bevelHistory, setLog = null }) 
   );
 }
 
-export function DashboardView({ health, setHealth, log, bevelHistory, vitals = {}, sleep = {}, workouts = [], setLog = {}, customExercises = [] }) {
+export function DashboardView({ health, setHealth, log, bevelHistory, vitals = {}, sleep = {}, workouts = [], setLog = {}, customExercises = [], soreness = {}, setSoreness = null }) {
   const [subTab, setSubTab] = useState("daily"); // "daily" | "weekly"
   const [activeSheet, setActiveSheet] = useState(null); // null | "recovery" | "sleep" | "strain"
   const [showImport, setShowImport] = useState(false);
@@ -457,6 +457,8 @@ export function DashboardView({ health, setHealth, log, bevelHistory, vitals = {
               setLog={setLog}
               log={log}
               customExercises={customExercises}
+              soreness={soreness}
+              setSoreness={setSoreness}
               selectedDate={selectedDate}
               todayKey={todayKey}
             />

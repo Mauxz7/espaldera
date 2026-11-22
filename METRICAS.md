@@ -14,7 +14,8 @@ claves locales `"YYYY-MM-DD"` (`dkey()` de `src/lib/dates.js`).
 | `vitals` | `{ fecha: { hrv, rhr, resp, spo2, tempDev, steps, sleepHr, awakeHr, hrDip } }` | de Fitbit; un día puede traer solo `steps` hasta que llega la noche |
 | `sleep` | `{ fecha_despertar: { min, bed, wake, inBedMin, deepMin, remMin, lightMin, awakeMin, awakenings, eff } }` | |
 | `workouts` | `[{ id, type, kind, start, end, min, zones?, avgHr? }]` | `zones` aún no llega en los datos reales → la UI debe tolerar `null` |
-| `setLog` | `{ fecha: { rutina: { ejercicio: [{ reps, load }] } } }` | series registradas en Shift |
+| `setLog` | `{ fecha: { rutina: { ejercicio: [{ reps, load, rir? }] } } }` | series registradas en Shift (`free` para entreno libre) |
+| `soreness` | `{ fecha: { grupo: true } }` | marca manual «Lo siento cargado» (fuerza ≤ 65 % por 24 h) |
 | `bevelHistory` | `computeBevelHistory(...)` → `{ byDate, today, latestDate }` | ya se calcula en `App.jsx` |
 
 ## Funciones y lo que devuelven
@@ -48,19 +49,31 @@ Cada uno:
 ```
 Etiquetas: Calibrando, Desentrenando, Manteniendo, Productivo, En pico, Fatigado, Sobreentrenando.
 
-### `muscleFreshness(setLog, dateKey)` → frescura por grupo
+### `exerciseMuscles(exId, customExercises?)` → mapa muscular por ejercicio
+Devuelve `{ grupo: peso }` (1 = motor principal). Respeta el campo `muscles` en ejercicios de `program.js`, `EXERCISE_LIBRARY`, `SUBS` o `customExercises` (y `primaryGroup`/`secondaryGroups`), y cae a `PATTERN_MUSCLES[pattern]` solo si no hay mapa explícito. `routineMuscles(rid, variantId)` también usa `exerciseMuscles`.
+
+### `muscleFreshness(setLog, dateKey, opts?)` → frescura por grupo
 ```js
 [{ group: "lats", label: "Dorsales", pct: 87, lastDate: "2026-11-21", sets: 6 }, ... 11 grupos]
 ```
 Grupos: `MUSCLE_GROUPS` (pecho, dorsales, espalda alta, hombros, bíceps, tríceps, core,
-cuádriceps, glúteos, isquios, pantorrillas). `sets` = series efectivas de los últimos 7 días.
+cuádriceps, glúteos, isquios, pantorrillas). `sets` = volumen ponderado real de los últimos 7 días.
 
-### `muscleGroups(setLog, dateKey, { log, workouts, days: 7 })` → hoja «Grupos musculares»
+### `muscleGroups(setLog, dateKey, { log, workouts, customExercises, soreness, now, sessionHour: 7, days: 7 })` → hoja «Grupos musculares»
 ```js
-{ groups: [{ group, label, pct: 66, status: "fatigued", sets: 10, reps: 90, lastDate, trained: true }, ...],
+{ groups: [{ group, label, pct: 66, status: "fatigued", sets: 10, reps: 90, lastDate, trained: true, manual: false }, ...],
   counts: { recovered: 8, fatigued: 3, depleted: 0 } }
 ```
-`status` con `freshnessStatus(pct)`: ≥80 `recovered`, ≥50 `fatigued`, si no `depleted` (`FRESH_STATUS` trae etiqueta y tono).
+Modelo de fatiga realista (`MUSCLE_PROFILE`):
+- **Series efectivas:** cada serie multiplica por RIR (`≤1 → 1,2`, `2 → 1,0`, `≥3 → 0,75`, usando `s.rir` si existe o el del ejercicio), excéntrica lenta (primer dígito del `tempo ≥ 4 → ×1,3`) y novedad (`×1,25` si el grupo no se entrenó en los 10 días previos).
+- **Capacidad y recuperación por tamaño:**
+  - Grandes (`chest`, `lats`, `quads`, `glutes`, `hamstrings`): capacidad 7, recuperación 72 h.
+  - Medianos (`shoulders`, `upperBack`, `core`): capacidad 6, recuperación 60 h.
+  - Chicos (`biceps`, `triceps`, `calves`): capacidad 6 (ajustada de 5 → 6 para que el estímulo indirecto de dominadas recupere a ≥ 80 % en 30 h), recuperación 48 h.
+- **Saturación diaria:** la carga efectiva acumulada de un día sobre un grupo entra como `1 - exp(-eff / capacidad)` (suave, evita saturar en 0 % con un solo día compuesto).
+- **Curva no lineal (`recoveryDecay`):** la fatiga restante permanece en `1` las primeras 12 h (agujetas iniciales) y baja con `0.5·(1 + cos(π·t))` hasta `0` en `recoveryHours`.
+- **Marca manual (`toggleSoreness`):** si `soreness[fecha][grupo]` está activo (o dentro de las 24 h previas si se pasa `now`), fuerza `pct ≤ 65` (Fatigado) y devuelve `manual: true`.
+- `status` con `freshnessStatus(pct)`: ≥80 `recovered`, ≥50 `fatigued`, si no `depleted` (`FRESH_STATUS` trae etiqueta y tono).
 Sesiones de `log` sin series registradas cuentan con las series planeadas de la rutina; entrenos
 de Fitbit `kind: "run"` cuentan como trote en días sin sesión de Shift. `reps` = carga (repeticiones
 ponderadas), `sets` = volumen. `muscleFreshness()` es un atajo con la forma anterior.

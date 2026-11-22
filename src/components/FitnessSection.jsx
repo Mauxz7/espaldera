@@ -115,7 +115,7 @@ function SemiGaugeCard({ title, icon: Icon, load, onClick }) {
 /**
  * Sección Fitness dentro de Salud: Carga cardio, Carga muscular, Cardio Focus y Frescura muscular.
  */
-export function FitnessSection({ bevelHistory, workouts, setLog, log, customExercises = [], selectedDate, todayKey }) {
+export function FitnessSection({ bevelHistory, workouts, setLog, log, customExercises = [], soreness = {}, setSoreness = null, selectedDate, todayKey }) {
   const [openLoad, setOpenLoad] = useState(null); // null | "cardio" | "muscular"
   const [openMuscles, setOpenMuscles] = useState(false);
 
@@ -128,14 +128,14 @@ export function FitnessSection({ bevelHistory, workouts, setLog, log, customExer
     [workouts, selectedDate],
   );
   const muscles = useMemo(
-    () => muscleGroups(setLog, selectedDate, { log, workouts, customExercises }),
-    [setLog, log, workouts, customExercises, selectedDate],
+    () => muscleGroups(setLog, selectedDate, { log, workouts, customExercises, soreness }),
+    [setLog, log, workouts, customExercises, soreness, selectedDate],
   );
   const tiredest = muscles.groups.filter((g) => g.status !== "recovered").sort((a, b) => a.pct - b.pct).slice(0, 3);
   const previewColor = (group) => {
     const g = muscles.groups.find((x) => x.group === group);
     if (!g) return null;
-    if (!g.trained) return { fill: "rgb(255 255 255)", opacity: 0.1 };
+    if (!g.trained && !g.manual) return { fill: "rgb(255 255 255)", opacity: 0.1 };
     return { fill: TONE_RGB[FRESH_STATUS[g.status].tone], opacity: 0.35 + 0.6 * (g.pct / 100) };
   };
 
@@ -243,7 +243,13 @@ export function FitnessSection({ bevelHistory, workouts, setLog, log, customExer
               {tiredest.length > 0 ? (
                 <div className="border-t border-line pt-2 text-xs text-muted">
                   {tiredest.map((g) => (
-                    <div key={g.group} className="flex justify-between gap-2"><span className="truncate">{g.label}</span><span className="font-mono font-bold text-fg">{g.pct} %</span></div>
+                    <div key={g.group} className="flex justify-between gap-2">
+                      <span className="flex min-w-0 items-center gap-1.5 truncate">
+                        <span className="truncate">{g.label}</span>
+                        {g.manual && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true" title="Marcado como cargado" />}
+                      </span>
+                      <span className="font-mono font-bold text-fg">{g.pct} %</span>
+                    </div>
                   ))}
                 </div>
               ) : (
@@ -261,6 +267,8 @@ export function FitnessSection({ bevelHistory, workouts, setLog, log, customExer
           log={log}
           workouts={workouts}
           customExercises={customExercises}
+          soreness={soreness}
+          setSoreness={setSoreness}
           initialDate={selectedDate}
           todayKey={todayKey}
           onClose={() => setOpenMuscles(false)}
