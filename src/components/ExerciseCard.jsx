@@ -6,7 +6,7 @@ import { SUB_KIND, PATTERNS } from "../data/subs.js";
 import { getAlternativesForExercise } from "../lib/routines.js";
 import { parseTargetReps } from "../lib/setLog.js";
 import { suggestProgression } from "../lib/progression.js";
-import { Chip } from "./ui.jsx";
+import { Card, Chip, StatusDot } from "./ui.jsx";
 
 export function SwapModal({ ex, week, current, skipped = false, onPick, onSkip, onClose }) {
   const titleId = useId();
@@ -78,17 +78,17 @@ export function SwapModal({ ex, week, current, skipped = false, onPick, onSkip, 
     const rirNew = effRir({ rir: item.rir }, week);
     return (
       <button key={isOriginal ? "original" : item.id} type="button" onClick={() => onPick(isOriginal ? null : item.id)} aria-pressed={active}
-        className={`w-full rounded-2xl border p-3 text-left transition ${active ? "border-accent bg-accent/10" : "border-line bg-surface2 hover:border-muted"}`}>
+        className={`w-full rounded-2xl p-3.5 text-left transition ${active ? "bg-accent/12 ring-1 ring-inset ring-accent/50" : "bg-white/[0.05] hover:bg-white/[0.09]"}`}>
         <div className="flex flex-wrap items-center gap-1.5">
           {isOriginal ? <Chip>Original</Chip> : <Chip tone={item.kind === "eq" ? "good" : "cool"}>{badgeText || SUB_KIND[item.kind]}</Chip>}
           {active && <Chip tone="accent"><Check size={11} />En uso</Chip>}
         </div>
         <div className="mt-1.5 text-[15px] font-semibold leading-snug">{item.name}</div>
         <div className="mt-1 flex flex-wrap gap-1.5">{item.eq.map((e) => <Chip key={e}>{EQ[e]}</Chip>)}</div>
-        <div className="mt-2 grid grid-cols-3 gap-2 rounded-xl bg-surface px-3 py-1.5 text-center font-mono text-xs">
-          <div><div className="text-[10px] uppercase tracking-widest text-muted">Reps</div><div className={!isOriginal && item.reps !== ex.reps ? "text-accent" : ""}>{item.reps}</div></div>
-          <div><div className="text-[10px] uppercase tracking-widest text-muted">Tempo</div><div className={!isOriginal && item.tempo !== ex.tempo ? "text-accent" : ""}>{item.tempo}</div></div>
-          <div><div className="text-[10px] uppercase tracking-widest text-muted">RIR</div><div className={!isOriginal && rirNew !== rirOrig ? "text-accent" : ""}>{isOriginal ? rirOrig : rirNew}</div></div>
+        <div className="mt-2 grid grid-cols-3 gap-2 rounded-xl bg-white/[0.05] px-3 py-2 text-center font-mono text-xs font-bold">
+          <div><div className="font-sans text-[11px] font-medium text-muted">Reps</div><div className={!isOriginal && item.reps !== ex.reps ? "text-accent" : ""}>{item.reps}</div></div>
+          <div><div className="font-sans text-[11px] font-medium text-muted">Tempo</div><div className={!isOriginal && item.tempo !== ex.tempo ? "text-accent" : ""}>{item.tempo}</div></div>
+          <div><div className="font-sans text-[11px] font-medium text-muted">RIR</div><div className={!isOriginal && rirNew !== rirOrig ? "text-accent" : ""}>{isOriginal ? rirOrig : rirNew}</div></div>
         </div>
         {!isOriginal && <p className="mt-2 text-xs text-muted">{item.why}</p>}
       </button>
@@ -114,11 +114,11 @@ export function SwapModal({ ex, week, current, skipped = false, onPick, onSkip, 
       <div className="flex min-h-0 flex-1 flex-col p-5 pb-[max(20px,env(safe-area-inset-bottom))]">
         <div className="mb-3 flex shrink-0 items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">Sustituir / Alternativa · {ex.block}</div>
-            <h2 id={titleId} className="font-display text-2xl font-semibold uppercase leading-none">{ex.name}</h2>
+            <div className="text-[13px] font-medium text-accent">Sustituir / Alternativa · {ex.block}</div>
+            <h2 id={titleId} className="mt-0.5 text-2xl font-bold leading-tight tracking-tight">{ex.name}</h2>
             <p className="mt-1 text-xs text-muted">Las series se mantienen ({effSets(ex, week)}). Reps, tempo y RIR se ajustan solos.</p>
           </div>
-          <button type="button" onClick={() => dialogRef.current?.close()} className="rounded-full p-1 text-muted hover:text-fg" aria-label="Cerrar"><X size={22} /></button>
+          <button type="button" onClick={() => dialogRef.current?.close()} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/[0.07] text-muted hover:bg-white/[0.12] hover:text-fg" aria-label="Cerrar"><X size={20} /></button>
         </div>
 
         <div role="tablist" aria-label="Opciones de sustitución" onKeyDown={handleTabKeyDown} className="mb-3 flex shrink-0 gap-2 border-b border-line pb-2">
@@ -142,19 +142,19 @@ export function SwapModal({ ex, week, current, skipped = false, onPick, onSkip, 
             <div className="no-scrollbar mb-3 flex gap-1.5 overflow-x-auto pb-1">
               {patternKeys.map((k) => (
                 <button key={k} type="button" onClick={() => setPatternFilter(k)} aria-pressed={patternFilter === k}
-                  className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium transition ${patternFilter === k ? "border-accent bg-accent/15 text-accent" : "border-line bg-surface2 text-muted hover:text-fg"}`}>
+                  className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition ${patternFilter === k ? "bg-accent/15 text-accent" : "bg-white/[0.07] text-muted hover:text-fg"}`}>
                   {PATTERNS[k]}
                 </button>
               ))}
               <button type="button" onClick={() => setPatternFilter("all")} aria-pressed={patternFilter === "all"}
-                className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium transition ${patternFilter === "all" ? "border-accent bg-accent/15 text-accent" : "border-line bg-surface2 text-muted hover:text-fg"}`}>
+                className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition ${patternFilter === "all" ? "bg-accent/15 text-accent" : "bg-white/[0.07] text-muted hover:text-fg"}`}>
                 Todos
               </button>
             </div>
             <div className="space-y-3">
               {libraryItems.length ? libraryItems.map((group) => (
                 <div key={group.key} className="space-y-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-widest text-muted">{group.label}</div>
+                  <div className="text-[13px] font-medium text-muted">{group.label}</div>
                   {group.list.map((item) => row(item, false, PATTERNS[item.pattern]))}
                 </div>
               )) : (
@@ -167,7 +167,7 @@ export function SwapModal({ ex, week, current, skipped = false, onPick, onSkip, 
         {onSkip && (
           <div className="mt-3 shrink-0 border-t border-line pt-3">
             <button type="button" onClick={() => { onSkip(); dialogRef.current?.close(); }}
-              className={`flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-semibold transition ${skipped ? "border-accent/50 bg-accent/10 text-accent hover:bg-accent/20" : "border-line bg-surface2 text-muted hover:border-warn hover:text-warn"}`}>
+              className={`flex min-h-[44px] w-full items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${skipped ? "bg-accent/15 text-accent hover:bg-accent/25" : "bg-white/[0.07] text-muted hover:bg-warn/15 hover:text-warn"}`}>
               {skipped ? <><RotateCcw size={14} />Restaurar este bloque hoy</> : <><SkipForward size={14} />Saltar este bloque hoy</>}
             </button>
           </div>
@@ -215,20 +215,20 @@ export function ExerciseCard({
 
   if (skipped) {
     return (
-      <article className="rounded-2xl border border-dashed border-line bg-surface/60 p-4">
+      <Card as="article" className="opacity-70 border-dashed">
         <div className="flex items-center gap-3">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface2 font-display text-base font-semibold text-muted">{ex.block}</div>
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/[0.07] font-mono text-base font-bold text-muted">{ex.block}</div>
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-[15px] font-medium text-muted line-through">{ex.name}</h3>
+            <h3 className="truncate text-base font-medium text-muted line-through">{ex.name}</h3>
             <div className="text-xs text-muted">Saltado hoy · no cuenta en el progreso</div>
           </div>
           {onSkip && (
-            <button type="button" onClick={onSkip} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-surface2 px-3 py-1.5 text-xs font-medium text-fg hover:border-accent hover:text-accent">
+            <button type="button" onClick={onSkip} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-white/[0.08] px-3 py-2 text-xs font-semibold text-fg hover:bg-white/[0.14] hover:text-accent">
               <RotateCcw size={13} />Restaurar
             </button>
           )}
         </div>
-      </article>
+      </Card>
     );
   }
 
@@ -297,11 +297,11 @@ export function ExerciseCard({
   };
 
   return (
-    <article className={`rounded-2xl border bg-surface p-4 transition-colors ${complete ? "border-good/40" : alt ? "border-cool/40" : "border-line"}`}>
+    <Card as="article" className={`transition-colors ${complete ? "ring-1 ring-inset ring-good/35" : alt ? "ring-1 ring-inset ring-cool/35" : ""}`}>
       <div className="flex items-start gap-3">
-        <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg font-display text-base font-semibold ${complete ? "bg-good/15 text-good" : "bg-surface2 text-accent"}`}>{ex.block}</div>
+        <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl font-mono text-base font-bold ${complete ? "bg-good/15 text-good" : "bg-white/[0.07] text-accent"}`}>{ex.block}</div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-[15px] font-semibold leading-snug">{ex.name}</h3>
+          <h3 className="text-base font-semibold leading-snug text-fg">{ex.name}</h3>
           {alt && (
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-cool">
               <span>Sustituye a: {original.name}</span>
@@ -311,30 +311,30 @@ export function ExerciseCard({
           <div className="mt-1.5 flex flex-wrap gap-1.5">{ex.eq.map((e) => <Chip key={e}>{EQ[e]}</Chip>)}</div>
         </div>
         {onFocus && (
-          <button type="button" onClick={onFocus} className="-mr-1 -mt-1 grid h-10 w-10 shrink-0 place-items-center rounded-xl text-muted hover:bg-surface2 hover:text-accent" aria-label={`Abrir ${ex.name} en modo entreno`} title="Modo entreno desde aquí">
+          <button type="button" onClick={onFocus} className="-mr-1 -mt-1 grid h-10 w-10 shrink-0 place-items-center rounded-xl text-muted hover:bg-white/[0.08] hover:text-accent" aria-label={`Abrir ${ex.name} en modo entreno`} title="Modo entreno desde aquí">
             <Maximize2 size={18} />
           </button>
         )}
       </div>
-      <dl className="mt-3 grid grid-cols-[0.8fr_1.6fr_0.6fr_1.2fr] gap-2 rounded-xl bg-surface2 px-3 py-2 text-center">
-        <div><dt className="text-[10px] uppercase tracking-widest text-muted">Series</dt><dd className="font-mono text-sm tabular-nums">{n}</dd></div>
-        <div className="min-w-0"><dt className="text-[10px] uppercase tracking-widest text-muted">Reps</dt><dd className="truncate font-mono text-sm" title={ex.reps}>{ex.reps}</dd></div>
-        <div><dt className="text-[10px] uppercase tracking-widest text-muted">RIR</dt><dd className="font-mono text-sm tabular-nums">{effRir(ex, week)}</dd></div>
-        <div><dt className="text-[10px] uppercase tracking-widest text-muted">Tempo</dt><dd className="whitespace-nowrap font-mono text-sm">{ex.tempo}</dd></div>
+      <dl className="mt-3 grid grid-cols-[0.75fr_1.65fr_0.6fr_1.2fr] gap-2 rounded-2xl bg-white/[0.05] px-3 py-2.5 text-center">
+        <div><dt className="text-[11px] font-medium text-muted">Series</dt><dd className="font-mono text-sm font-bold text-fg tabular-nums">{n}</dd></div>
+        <div className="min-w-0"><dt className="text-[11px] font-medium text-muted">Reps</dt><dd className="truncate font-mono text-sm font-bold text-fg" title={ex.reps}>{ex.reps}</dd></div>
+        <div><dt className="text-[11px] font-medium text-muted">RIR</dt><dd className="font-mono text-sm font-bold text-fg tabular-nums">{effRir(ex, week)}</dd></div>
+        <div><dt className="text-[11px] font-medium text-muted">Tempo</dt><dd className="whitespace-nowrap font-mono text-sm font-bold text-fg">{ex.tempo}</dd></div>
       </dl>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button onClick={onSwap} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface2 px-3 py-1.5 text-xs font-medium hover:border-cool hover:text-cool">
+        <button onClick={onSwap} className="inline-flex items-center gap-1.5 rounded-xl bg-white/[0.07] px-3 py-2 text-xs font-medium text-fg/90 transition hover:bg-white/[0.12] hover:text-cool">
           <ArrowLeftRight size={14} />Sustituir
         </button>
         {onSkip && (
-          <button type="button" onClick={onSkip} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface2 px-2.5 py-1.5 text-xs font-medium text-muted hover:border-warn hover:text-warn" title="Saltar este bloque hoy">
+          <button type="button" onClick={onSkip} className="inline-flex items-center gap-1.5 rounded-xl bg-white/[0.07] px-3 py-2 text-xs font-medium text-muted transition hover:bg-warn/15 hover:text-warn" title="Saltar este bloque hoy">
             <SkipForward size={14} />Saltar
           </button>
         )}
         <label className="ml-auto flex items-center gap-1.5 text-xs text-muted">
           Carga
           <input value={load || ""} onChange={(e) => onLoad(e.target.value)} placeholder="ej. 40 kg" maxLength={24}
-            className="w-24 rounded-lg border border-line bg-surface2 px-2 py-1.5 font-mono text-xs text-fg placeholder:text-muted/60 focus:border-accent focus:outline-none" />
+            className="w-24 rounded-xl border border-line bg-white/[0.06] px-2.5 py-1.5 font-mono text-xs font-bold text-fg placeholder:text-muted/60 focus:border-accent focus:outline-none" />
         </label>
       </div>
       {last && (last.v || last.reps) && (
@@ -346,7 +346,7 @@ export function ExerciseCard({
           >
             <History size={13} />
             Última vez ({fmtShort(last.d)}):{" "}
-            {last.v && <span className="font-mono text-fg">{last.v}</span>}
+            {last.v && <span className="font-mono font-bold text-fg">{last.v}</span>}
             {last.reps && <span className="text-muted">({last.reps})</span>}
             {last.v && " · usar"}
           </button>
@@ -354,7 +354,7 @@ export function ExerciseCard({
           <div className="mt-2 flex items-center gap-1.5 text-xs text-muted">
             <History size={13} />
             Última vez ({fmtShort(last.d)}):{" "}
-            {last.v && <span className="font-mono text-fg">{last.v}</span>}
+            {last.v && <span className="font-mono font-bold text-fg">{last.v}</span>}
             {last.reps && <span className="text-muted">({last.reps})</span>}
           </div>
         )
@@ -385,10 +385,10 @@ export function ExerciseCard({
             onClick={() => handleButtonClick(i)}
             aria-pressed={!!done[i]}
             aria-label={`Serie ${i + 1}`}
-            className={`grid h-10 w-10 select-none place-items-center rounded-full border font-mono text-sm transition ${
+            className={`grid h-10 w-10 select-none place-items-center rounded-full font-mono text-sm font-bold transition ${
               done[i]
-                ? "border-accent bg-accent text-accentInk"
-                : "border-line bg-surface2 text-muted hover:border-accent/60"
+                ? "bg-accent text-accentInk shadow-[0_4px_14px_rgb(232_181_110/.28)]"
+                : "bg-white/[0.07] text-muted hover:bg-white/[0.12] hover:text-fg"
             }`}
           >
             {done[i] ? <Check size={16} strokeWidth={3} /> : i + 1}
@@ -405,10 +405,10 @@ export function ExerciseCard({
               openEdit(target);
             }
           }}
-          className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs transition ${
+          className={`inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-medium transition ${
             editingIndex != null
-              ? "border-accent bg-accent/15 text-accent"
-              : "border-line bg-surface2 text-muted hover:text-fg"
+              ? "bg-accent/15 text-accent"
+              : "bg-white/[0.07] text-muted hover:bg-white/[0.12] hover:text-fg"
           }`}
           aria-label="Editar repeticiones o carga de la serie"
           title="Ajustar repeticiones y carga"
@@ -429,15 +429,15 @@ export function ExerciseCard({
                 key={i}
                 type="button"
                 onClick={() => openEdit(i)}
-                className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[11px] transition ${
+                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 font-mono text-[11px] transition ${
                   editingIndex === i
-                    ? "border-accent bg-accent/15 text-accent"
-                    : "border-line bg-surface2 text-muted hover:border-accent hover:text-fg"
+                    ? "bg-accent/15 text-accent"
+                    : "bg-white/[0.06] text-muted hover:bg-white/[0.12] hover:text-fg"
                 }`}
                 title={`Serie ${i + 1}: ${s.reps} reps${s.load ? ` · ${s.load}` : ""}. Toca para editar.`}
               >
                 <span className="text-[10px] text-muted">S{i + 1}:</span>
-                <span className="font-semibold text-fg">{s.reps}</span>
+                <span className="font-bold text-fg">{s.reps}</span>
                 {s.load && <span className="text-accent">({s.load})</span>}
               </button>
             );
@@ -446,22 +446,20 @@ export function ExerciseCard({
       )}
 
       {editingIndex !== null && (
-        <div className="mt-2.5 rounded-xl border border-accent/40 bg-surface2 p-3 text-xs">
+        <div className="mt-3 rounded-2xl border border-accent/30 bg-white/[0.06] p-3.5 text-xs">
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-accent">
+              <span className="text-[13px] font-semibold text-accent">
                 Serie {editingIndex + 1} de {n}
               </span>
               {done[editingIndex] && (
-                <span className="rounded bg-good/15 px-1.5 py-0.5 text-[10px] font-medium text-good">
-                  Registrada
-                </span>
+                <StatusDot tone="good">Registrada</StatusDot>
               )}
             </div>
             <button
               type="button"
               onClick={() => setEditingIndex(null)}
-              className="rounded p-0.5 text-muted hover:text-fg"
+              className="rounded-lg p-1 text-muted hover:text-fg"
               aria-label="Cerrar editor"
             >
               <X size={14} />
@@ -473,7 +471,7 @@ export function ExerciseCard({
               <button
                 type="button"
                 onClick={() => adjustReps(-1)}
-                className="grid h-7 w-7 place-items-center rounded-lg border border-line bg-surface font-mono text-sm hover:border-accent active:scale-95"
+                className="grid h-7 w-7 place-items-center rounded-lg bg-white/[0.08] font-mono text-sm font-bold hover:bg-white/[0.14] active:scale-95"
                 aria-label="Menos repeticiones"
               >
                 -
@@ -486,12 +484,12 @@ export function ExerciseCard({
                   if (e.key === "Enter") handleSaveEdit();
                   else if (e.key === "Escape") setEditingIndex(null);
                 }}
-                className="w-14 rounded-lg border border-line bg-surface py-1 text-center font-mono text-sm text-fg focus:border-accent focus:outline-none"
+                className="w-14 rounded-lg border border-line bg-bg/50 py-1 text-center font-mono text-sm font-bold text-fg focus:border-accent focus:outline-none"
               />
               <button
                 type="button"
                 onClick={() => adjustReps(1)}
-                className="grid h-7 w-7 place-items-center rounded-lg border border-line bg-surface font-mono text-sm hover:border-accent active:scale-95"
+                className="grid h-7 w-7 place-items-center rounded-lg bg-white/[0.08] font-mono text-sm font-bold hover:bg-white/[0.14] active:scale-95"
                 aria-label="Más repeticiones"
               >
                 +
@@ -509,13 +507,13 @@ export function ExerciseCard({
                 }}
                 placeholder="ej. 40 kg"
                 maxLength={24}
-                className="w-24 rounded-lg border border-line bg-surface px-2 py-1 font-mono text-xs text-fg placeholder:text-muted/60 focus:border-accent focus:outline-none"
+                className="w-24 rounded-lg border border-line bg-bg/50 px-2 py-1 font-mono text-xs font-bold text-fg placeholder:text-muted/60 focus:border-accent focus:outline-none"
               />
             </div>
             <button
               type="button"
               onClick={handleSaveEdit}
-              className="ml-auto rounded-lg bg-accent px-3 py-1 text-xs font-semibold text-accentInk hover:opacity-90 active:scale-95"
+              className="ml-auto rounded-xl bg-accent px-3.5 py-1.5 text-xs font-semibold text-accentInk hover:brightness-105 active:scale-95"
             >
               Guardar
             </button>
@@ -528,6 +526,6 @@ export function ExerciseCard({
         <ChevronDown size={16} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && <ul className="mt-2 space-y-1.5 border-t border-line pt-2 text-sm text-muted">{ex.tips.map((t, i) => <li key={i} className="flex gap-2"><span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-accent" />{t}</li>)}</ul>}
-    </article>
+    </Card>
   );
 }

@@ -8,7 +8,7 @@ import { MAX_RUN_LEVEL, getRunLevel } from "../data/runPlan.js";
 import { ROUTINES, BLOCK_WEEKS, effSets, routineById, variantsFor } from "../data/program.js";
 import { altFor } from "../data/subs.js";
 import { resolveVariantId, setRoutineVariant, toggleSkipExercise, computeRoutineProgress } from "../lib/routines.js";
-import { ProgressBar } from "../components/ui.jsx";
+import { ProgressBar, Card, StatusDot, btnCls } from "../components/ui.jsx";
 import { SwapModal, ExerciseCard, withAlt } from "../components/ExerciseCard.jsx";
 import { WorkoutMode } from "../components/WorkoutMode.jsx";
 import { WorkoutSummary } from "../components/WorkoutSummary.jsx";
@@ -301,46 +301,46 @@ export function TrainView({ sets, setSets, seriesLog: seriesLogProp, setSeriesLo
 
   return (
     <div>
-      <div className="min-w-0 space-y-4">
+      <div className="min-w-0 space-y-5">
         <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
           {ROUTINES.map((r) => {
             const chipRoutine = routineById(r.id, activeRunLevel, resolveVariantId(r.id, routineVariants));
             return (
               <button key={r.id} data-routine-chip onClick={() => setRid(r.id)} aria-pressed={r.id === rid}
-                className={`shrink-0 rounded-xl border px-3.5 py-2 text-left transition ${r.id === rid ? (r.low ? "border-cool bg-cool/15" : "border-accent bg-accent/15") : "border-line bg-surface hover:border-muted"}`}>
-                <div className={`flex items-center gap-1 text-[11px] font-semibold uppercase tracking-widest ${r.id === rid ? (r.low ? "text-cool" : "text-accent") : "text-muted"}`}>{r.low && <BatteryLow size={12} />}{r.short}{log[today]?.r === r.id && <Check size={12} />}</div>
+                className={`shrink-0 rounded-2xl px-3.5 py-2.5 text-left transition ${r.id === rid ? (r.low ? "bg-cool/15 ring-1 ring-inset ring-cool/45" : "bg-accent/15 ring-1 ring-inset ring-accent/45") : "bg-white/[0.06] hover:bg-white/[0.1]"}`}>
+                <div className={`flex items-center gap-1 text-xs font-medium ${r.id === rid ? (r.low ? "text-cool" : "text-accent") : "text-muted"}`}>{r.low && <BatteryLow size={12} />}{r.short}{log[today]?.r === r.id && <Check size={12} />}</div>
                 <div className="whitespace-nowrap text-sm font-medium">{r.low ? (chipRoutine.variantId === "trx_upper" ? "Torso Correas · 20 min" : "Baja energía · 20 min") : chipRoutine.name}</div>
               </button>
             );
           })}
         </div>
 
-        <section className="rounded-2xl border border-line bg-surface p-4 md:p-5">
+        <Card glow={logged && logged.r === rid ? "good" : routine.low ? "cool" : "accent"}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">{routine.short} · ~{routine.minutes} min · Semana {week} {bw.label}</div>
-              <h1 className="font-display text-3xl font-semibold uppercase leading-[0.95] md:text-4xl">{routine.name}</h1>
+              <div className="text-[13px] font-medium text-muted">{routine.short} · ~{routine.minutes} min · Semana {week} {bw.label}</div>
+              <h1 className="mt-0.5 text-[30px] font-bold leading-tight tracking-tight sm:text-[34px]">{routine.name}</h1>
               <p className="mt-1 max-w-prose text-sm text-muted">{routine.focus}</p>
               {rid === "d3" && (
-                <p className="mt-1.5 text-xs font-medium text-accent">
+                <p className="mt-1.5 text-[13px] font-medium text-accent">
                   Nivel {runPlan.level} de {MAX_RUN_LEVEL} · {runPlan.reps} × {runPlan.runMin} min trote + {runPlan.walkMin} min caminata
                 </p>
               )}
             </div>
             <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-              <button onClick={() => openMode()} disabled={!activeItems.length} className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accentInk shadow-lg disabled:opacity-40 sm:w-auto">
-                <Play size={16} />Modo entreno
+              <button onClick={() => openMode()} disabled={!activeItems.length} className={btnCls("primary", "w-full sm:w-auto")}>
+                <Play size={17} fill="currentColor" />Modo entreno
               </button>
               {!fitbitShortcut.hidden && (
                 <a
                   href={buildFitbitShortcutUrl(fitbitShortcut.name)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface2 px-3.5 py-2.5 text-sm font-semibold text-fg transition hover:border-accent hover:text-accent"
+                  className={btnCls("ghost", "flex-1 basis-[10.5rem] whitespace-nowrap px-3.5 text-sm sm:flex-none")}
                 >
                   <Watch size={16} className="text-accent" />
                   Empezar con Fitbit
                 </a>
               )}
-              <button onClick={openWarmup} className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface2 px-3.5 py-2.5 text-sm font-semibold text-fg transition hover:border-accent hover:text-accent"><Zap size={16} className="text-accent" />Modo Arranque (5 min)</button>
+              <button onClick={openWarmup} className={btnCls("ghost", "flex-1 basis-[10.5rem] whitespace-nowrap px-3.5 text-sm sm:flex-none")}><Zap size={16} className="text-accent" />Modo Arranque (5 min)</button>
             </div>
           </div>
 
@@ -357,10 +357,10 @@ export function TrainView({ sets, setSets, seriesLog: seriesLogProp, setSeriesLo
                     aria-selected={active}
                     tabIndex={active ? 0 : -1}
                     onClick={() => pickVariant(v.id)}
-                    className={`shrink-0 rounded-xl border px-3 py-2 text-left text-xs transition ${
+                    className={`shrink-0 rounded-xl px-3.5 py-2 text-left text-xs transition ${
                       active
-                        ? "border-accent/60 bg-accent/15 text-fg"
-                        : "border-line bg-surface2 text-muted hover:text-fg"
+                        ? "bg-accent/15 text-fg"
+                        : "bg-white/[0.06] text-muted hover:bg-white/[0.1] hover:text-fg"
                     }`}
                   >
                     <div className={`whitespace-nowrap font-semibold ${active ? "text-accent" : ""}`}>{v.label}</div>
@@ -373,7 +373,7 @@ export function TrainView({ sets, setSets, seriesLog: seriesLogProp, setSeriesLo
 
           <div className="mt-4 flex items-center gap-3">
             <ProgressBar value={progress} />
-            <span className="shrink-0 font-mono text-sm tabular-nums">{done}/{total}</span>
+            <span className="shrink-0 font-mono text-sm font-bold tabular-nums">{done}/{total}</span>
           </div>
           {skippedCount > 0 && (
             <div className="mt-1.5 text-xs text-muted">
@@ -381,21 +381,21 @@ export function TrainView({ sets, setSets, seriesLog: seriesLogProp, setSeriesLo
             </div>
           )}
           {done > 0 && (
-            <button onClick={finish} className="mt-2 mr-2 inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-accent hover:text-accent">
+            <button onClick={finish} className="mt-2.5 mr-2 inline-flex min-h-[38px] items-center gap-1.5 rounded-xl bg-white/[0.07] px-3 py-1.5 text-xs font-medium text-fg/90 transition hover:bg-white/[0.12] hover:text-accent">
               <Flag size={14} />Terminar y ver resumen
             </button>
           )}
           {logged ? (
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-              <span className="inline-flex items-center gap-1.5 text-good"><Trophy size={14} />Sesión registrada hoy: {routineById(logged.r, undefined, logged.v).name}</span>
-              <button onClick={() => { if (logged.r === "d3") setRunLevel((prev) => undoRunSession(prev, today)); setLog((l) => { const n = { ...l }; delete n[today]; return n; }); }} className="rounded-lg px-2 py-1 text-muted hover:bg-surface2 hover:text-fg">Quitar registro</button>
+            <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
+              <StatusDot tone="good">Sesión registrada hoy: {routineById(logged.r, undefined, logged.v).name}</StatusDot>
+              <button onClick={() => { if (logged.r === "d3") setRunLevel((prev) => undoRunSession(prev, today)); setLog((l) => { const n = { ...l }; delete n[today]; return n; }); }} className="rounded-xl px-2.5 py-1.5 text-xs text-muted hover:bg-white/[0.08] hover:text-fg">Quitar registro</button>
             </div>
           ) : (
-            <button onClick={registerSession} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-good/40 px-3 py-1.5 text-xs text-good hover:bg-good/10">
+            <button onClick={registerSession} className="mt-2.5 inline-flex min-h-[38px] items-center gap-1.5 rounded-xl bg-good/15 px-3 py-1.5 text-xs font-semibold text-good transition hover:bg-good/25">
               <Check size={14} />Ya la hice: registrar sesión de hoy
             </button>
           )}
-        </section>
+        </Card>
 
         <div className="grid gap-3 2xl:grid-cols-2">
           {items.map(({ ex, alt, done: doneArr, series: exSeries, currentLoad, last, skipped }) => (

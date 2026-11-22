@@ -40,37 +40,37 @@ export function RestTimer({ timer, setTimer }) {
   return (
     <div className="timer-dock fixed z-40 flex flex-col items-end gap-2">
       {doneFlash && (
-        <button onClick={() => setDoneFlash(false)} className="flash rounded-2xl bg-accent px-4 py-3 text-left text-accentInk shadow-xl">
-          <div className="font-display text-xl font-semibold uppercase leading-none">Descanso terminado</div>
+        <button onClick={() => setDoneFlash(false)} className="flash rounded-2xl bg-gradient-to-b from-[#f3c582] to-[#e2a95a] px-4 py-3 text-left text-accentInk shadow-[0_8px_24px_rgb(232_181_110/.35)]">
+          <div className="text-lg font-bold leading-tight tracking-tight">Descanso terminado</div>
           <div className="text-xs opacity-80">Siguiente serie. Toca para cerrar.</div>
         </button>
       )}
       {open && (
-        <div className="w-64 rounded-2xl border border-line bg-surface p-4 shadow-2xl">
+        <div className="w-64 rounded-[22px] border border-white/[0.1] bg-[rgb(30_36_48/.94)] p-4 shadow-2xl backdrop-blur-xl">
           <div className="mb-3 flex items-center justify-between">
-            <span className="font-display text-lg font-semibold uppercase tracking-wide">Descanso</span>
-            <button onClick={() => setOpen(false)} className="rounded-full p-1 text-muted hover:text-fg" aria-label="Cerrar temporizador"><X size={18} /></button>
+            <span className="text-base font-bold tracking-tight">Descanso</span>
+            <button onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-full bg-white/[0.07] text-muted hover:text-fg" aria-label="Cerrar temporizador"><X size={16} /></button>
           </div>
-          <div className="mb-3 text-center font-mono text-5xl tabular-nums">{timer ? `${Math.floor(secs / 60)}:${pad(secs % 60)}` : "0:00"}</div>
+          <div className="mb-3 text-center font-mono text-5xl font-bold tabular-nums">{timer ? `${Math.floor(secs / 60)}:${pad(secs % 60)}` : "0:00"}</div>
           <div className="grid grid-cols-4 gap-2">
             {[45, 60, 90, 120].map((s) => (
-              <button key={s} onClick={() => start(s)} className="rounded-lg border border-line bg-surface2 py-2 font-mono text-sm hover:border-accent hover:text-accent">{s < 120 ? `${s}s` : "2m"}</button>
+              <button key={s} onClick={() => start(s)} className="rounded-xl bg-white/[0.07] py-2 font-mono text-sm font-bold text-fg transition hover:bg-accent/15 hover:text-accent">{s < 120 ? `${s}s` : "2m"}</button>
             ))}
           </div>
           <div className="mt-3 flex gap-2">
-            <button onClick={togglePause} disabled={!timer} className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-surface2 py-2 text-sm disabled:opacity-40">
+            <button onClick={togglePause} disabled={!timer} className="flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/[0.08] py-2 text-sm font-semibold text-fg transition hover:bg-white/[0.14] disabled:opacity-40">
               {timer?.paused ? <Play size={15} /> : <Pause size={15} />}{timer?.paused ? "Seguir" : "Pausa"}
             </button>
-            <button onClick={() => setTimer(null)} disabled={!timer} className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-surface2 py-2 text-sm disabled:opacity-40"><RotateCcw size={15} />Reset</button>
+            <button onClick={() => setTimer(null)} disabled={!timer} className="flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/[0.08] py-2 text-sm font-semibold text-fg transition hover:bg-white/[0.14] disabled:opacity-40"><RotateCcw size={15} />Reset</button>
           </div>
         </div>
       )}
-      <button onClick={() => { unlockAudio(); setOpen((o) => !o); }} className="relative grid h-16 w-16 place-items-center rounded-full border border-line bg-surface shadow-2xl" aria-label="Abrir temporizador de descanso">
+      <button onClick={() => { unlockAudio(); setOpen((o) => !o); }} className="relative grid h-16 w-16 place-items-center rounded-full border border-white/[0.1] bg-[rgb(30_36_48/.88)] shadow-[0_12px_32px_rgb(0_0_0/.45)] backdrop-blur-xl" aria-label="Abrir temporizador de descanso">
         <svg width="56" height="56" className="absolute -rotate-90">
-          <circle cx="28" cy="28" r={R} fill="none" stroke="var(--surface-2)" strokeWidth="4" />
-          <circle cx="28" cy="28" r={R} fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - frac)} style={{ transition: "stroke-dashoffset .2s linear" }} />
+          <circle cx="28" cy="28" r={R} fill="none" stroke="rgb(255 255 255 / .1)" strokeWidth="4" />
+          <circle cx="28" cy="28" r={R} fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - frac)} style={{ transition: "stroke-dashoffset .2s linear", filter: "drop-shadow(0 0 6px rgb(var(--c-accent) / .45))" }} />
         </svg>
-        {timer ? <span className="relative font-mono text-sm font-medium tabular-nums">{secs}</span> : <Timer size={22} className="relative text-accent" />}
+        {timer ? <span className="relative font-mono text-sm font-bold tabular-nums">{secs}</span> : <Timer size={22} className="relative text-accent" />}
       </button>
     </div>
   );
