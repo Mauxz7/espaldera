@@ -282,6 +282,13 @@ test("computeRecovery degrada a mode 'estimated' (SleepScore 65% + ATL3/CTL21 35
   assert.equal(empty.mode, "missing");
 });
 
+test("computeRecovery no adivina con la carga sola cuando aún no llega el sueño de la noche", () => {
+  const pending = computeRecovery({ vitals: { steps: 64 }, sleepScore: null, atl3: 80, ctl21: 45 });
+  assert.equal(pending.score, null);
+  assert.equal(pending.mode, "missing");
+  assert.equal(pending.zone, null);
+});
+
 // ===========================
 // 4. Strain Score (3 niveles cardio, muscular, anti-doble conteo, pasivo, >100%)
 // ===========================

@@ -87,6 +87,7 @@ export function HomeView({ wp, log, habits, setHabits, habitDefs, block, setBloc
                     {recScore != null ? `${recScore}%` : "—"}
                   </span>
                   {rec?.mode === "estimated" && <span className="text-[10px] text-muted">(est.)</span>}
+                  {rec?.mode === "missing" && <span className="text-[10px] text-muted">(esperando a Fitbit)</span>}
                 </span>
                 {strain?.target && (
                   <span className="inline-flex items-center gap-1.5">
