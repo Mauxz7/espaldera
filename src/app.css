@@ -35,7 +35,10 @@ dialog.sheet-dialog { margin: auto auto 0; padding: 0; width: 100%; max-width: 3
 dialog.sheet-dialog[open] { display: flex; flex-direction: column; padding-bottom: 0; }
 dialog.sheet-dialog:modal { overscroll-behavior: contain; }
 dialog.sheet-dialog::backdrop { background: rgb(0 0 0 / 0.65); overflow: hidden; overscroll-behavior: contain; }
-@media (min-width: 768px) { dialog.sheet-dialog { margin: auto; border-radius: 1.5rem; } }
+/* !important: la hoja vive dentro de contenedores space-y-*, cuyo margin-top (más específico)
+   la pegaba arriba del todo; en iPhone su cabecera quedaba bajo el reloj y la Dynamic Island. */
+dialog.sheet-dialog { margin: auto auto 0 !important; }
+@media (min-width: 768px) { dialog.sheet-dialog { margin: auto !important; border-radius: 1.5rem; } }
 [role="tab"] { position: relative; }
 [role="tab"][aria-selected="true"]::after { content: ""; position: absolute; inset: auto 10px 0; border-block-end: 2px solid var(--accent); }
 @keyframes rise { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
