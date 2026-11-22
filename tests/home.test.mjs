@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { weekProgress, todayPlan, MINUTES_GOAL } from "../src/lib/home.js";
+import { weekProgress, todayPlan, buildTodayBevelBanner, MINUTES_GOAL } from "../src/lib/home.js";
 
 const keys = Array.from({ length: 7 }, (_, i) => `2026-11-${String(9 + i).padStart(2, "0")}`);
 const defs = [
@@ -34,4 +34,66 @@ test("todayPlan prioriza lo registrado, luego Fitbit, luego el plan", () => {
   assert.deepEqual(todayPlan({ info: { rid: "d2" }, fromFitbit: "d1" }), { state: "fitbit", rid: "d1" });
   assert.deepEqual(todayPlan({ info: { rid: "d2", evening: true, office: true } }), { state: "planned", rid: "d2", evening: true, office: true });
   assert.deepEqual(todayPlan({ info: { rid: null, office: true } }), { state: "rest", rid: null, office: true });
+});
+
+test("buildTodayBevelBanner unifica ajuste Bevel y sueño < 6 h sin duplicar avisos", () => {
+  const swapped = buildTodayBevelBanner({
+    plan: { state: "planned", rid: "low" },
+    night: { min: 300 },
+    bevelAdjustment: {
+      applied: true,
+      action: "swap_low",
+      reason: "Recuperación baja (28%). Adaptamos hoy a Modo Baja Energía.",
+    },
+  });
+  assert.equal(swapped.tone, "warn");
+  assert.equal(swapped.offerLow, false);
+  assert.match(swapped.text, /Modo Baja Energía/);
+
+  const midWithPoorSleep = buildTodayBevelBanner({
+    plan: { state: "planned", rid: "d2" },
+    night: { min: 320 },
+    bevelAdjustment: {
+      applied: false,
+      action: "control_effort",
+      guidance: "Controla el RIR y mantén tu Strain entre 35 y 60%.",
+      reason: "Recuperación media (48%).",
+    },
+  });
+  assert.equal(midWithPoorSleep.tone, "warn");
+  assert.equal(midWithPoorSleep.offerLow, true);
+  assert.match(midWithPoorSleep.title, /5 h 20 min/);
+  assert.match(midWithPoorSleep.text, /35 y 60%/);
+
+  const midNormalSleep = buildTodayBevelBanner({
+    plan: { state: "planned", rid: "d1" },
+    night: { min: 450 },
+    bevelAdjustment: {
+      applied: false,
+      action: "control_effort",
+      guidance: "Controla el RIR y mantén tu Strain entre 35 y 60%.",
+      reason: "Recuperación media (55%). Mantén Día 1 cuidando la intensidad.",
+    },
+  });
+  assert.equal(midNormalSleep.tone, "cool");
+  assert.equal(midNormalSleep.offerLow, false);
+
+  const highPrio = buildTodayBevelBanner({
+    plan: { state: "planned", rid: "d2" },
+    night: { min: 480 },
+    bevelAdjustment: {
+      applied: true,
+      action: "prioritize",
+      reason: "Recuperación alta (84%). Aprovechamos tu buen estado hoy.",
+    },
+  });
+  assert.equal(highPrio.tone, "good");
+  assert.equal(highPrio.offerLow, false);
+
+  const noSignalGoodSleep = buildTodayBevelBanner({
+    plan: { state: "planned", rid: "d1" },
+    night: { min: 460 },
+    bevelAdjustment: null,
+  });
+  assert.equal(noSignalGoodSleep, null);
 });

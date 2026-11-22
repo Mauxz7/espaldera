@@ -15,11 +15,13 @@ import { WorkoutSummary } from "../components/WorkoutSummary.jsx";
 import { touchSession, finishSession, buildWorkoutSummary, nextPendingExercise } from "../lib/workout.js";
 import { useFitbitShortcut, buildFitbitShortcutUrl } from "../components/FitbitShortcutCard.jsx";
 
-export function TrainView({ sets, setSets, log, setLog, block, swaps, setSwaps, loads, setLoads, lastLoads, setLastLoads, routineVariants, setRoutineVariants, skips, setSkips, startTimer, openWarmup, wp, initialRid }) {
+export function TrainView({ sets, setSets, seriesLog: seriesLogProp, setSeriesLog: setSeriesLogProp, log, setLog, block, swaps, setSwaps, loads, setLoads, lastLoads, setLastLoads, routineVariants, setRoutineVariants, skips, setSkips, startTimer, openWarmup, wp, initialRid }) {
   const today = dkey();
   const [rid, setRid] = useState(() => initialRid || log[dkey()]?.r || wp.arr[wp.todayIdx] || wp.nextRid || "d1");
   const [swapFor, setSwapFor] = useState(null);
-  const [seriesLog, setSeriesLog] = usePersisted("setLog", {});
+  const [localSeriesLog, setLocalSeriesLog] = usePersisted("setLog", {});
+  const seriesLog = seriesLogProp !== undefined ? seriesLogProp : localSeriesLog;
+  const setSeriesLog = setSeriesLogProp || setLocalSeriesLog;
   const [runLevel, setRunLevel] = usePersisted("runLevel", DEFAULT_RUN_LEVEL);
   const [fitbitShortcut] = useFitbitShortcut();
   // Hora de inicio y fin del entreno de hoy (solo en este dispositivo, para la duración del resumen).
