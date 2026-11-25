@@ -293,3 +293,214 @@ test("computeStreak incluye días con entreno libre en setLog", () => {
   const setLog = { [fmt(1)]: { free: { lib_trx_curl: [{ reps: 12, load: "10 kg" }] } } };
   assert.equal(computeStreak(log, setLog), 2);
 });
+
+// Rutina semanal flexible: metas configurables y sesiones repetidas
+import {
+  DEFAULT_WEEK_TARGETS,
+  normalizeWeekTargets,
+  sumTargets,
+  applyWeekTargets,
+} from "../src/lib/planner.js";
+
+test("normalizeWeekTargets valida enteros 0..7, acota suma a 1..7 y cae en DEFAULT_WEEK_TARGETS si es inválido", () => {
+  assert.deepEqual(normalizeWeekTargets(null), DEFAULT_WEEK_TARGETS);
+  assert.deepEqual(normalizeWeekTargets(undefined), DEFAULT_WEEK_TARGETS);
+  assert.deepEqual(normalizeWeekTargets({}), DEFAULT_WEEK_TARGETS);
+  assert.deepEqual(normalizeWeekTargets([]), DEFAULT_WEEK_TARGETS);
+  assert.deepEqual(normalizeWeekTargets({ d1: 0, d2: 0, d3: 0, d4: 0 }), DEFAULT_WEEK_TARGETS);
+  assert.deepEqual(normalizeWeekTargets({ d1: -3, d2: "abc", d3: NaN, d4: null }), DEFAULT_WEEK_TARGETS);
+
+  assert.deepEqual(normalizeWeekTargets({ d3: 2, d4: 2 }), { d1: 0, d2: 0, d3: 2, d4: 2 });
+  assert.deepEqual(normalizeWeekTargets({ d1: "1", d2: 0, d3: 2.9, d4: 1.2 }), { d1: 1, d2: 0, d3: 2, d4: 1 });
+
+  const capped = normalizeWeekTargets({ d1: 3, d2: 3, d3: 3, d4: 3 });
+  assert.equal(sumTargets(capped), 7);
+  for (const c of MAIN) {
+    assert.ok(Number.isInteger(capped[c]) && capped[c] >= 0 && capped[c] <= 7);
+  }
+});
+
+test("rankPlans soporta mezclas repetidas sin duplicados y sin apilar el mismo entreno en días seguidos", () => {
+  // 2 Full (d4) + 2 Run (d3)
+  const tFullRun = { d1: 0, d2: 0, d3: 2, d4: 2 };
+  const rankedFR = rankPlans(HOME, {}, 0, HOME, null, null, null, null, tFullRun);
+  const seenFR = new Set(rankedFR.map((p) => p.arr.join(",")));
+  assert.equal(seenFR.size, rankedFR.length, "no debe haber planes duplicados");
+  const bestFR = rankedFR[0].arr;
+  assert.equal(bestFR.filter((r) => r === "d3").length, 2);
+  assert.equal(bestFR.filter((r) => r === "d4").length, 2);
+  assert.equal(bestFR.filter((r) => r === "d1" || r === "d2").length, 0);
+  for (let i = 1; i < 7; i++) {
+    if (bestFR[i]) assert.notEqual(bestFR[i], bestFR[i - 1], `no repetir en días seguidos: ${bestFR.join(",")}`);
+  }
+
+  // 2 Run (d3) + Torso (d1) + Full (d4)
+  const tRunTorsoFull = { d1: 1, d2: 0, d3: 2, d4: 1 };
+  const bestRTF = rankPlans(OFFICE, {}, 0, NONE, null, null, null, null, tRunTorsoFull)[0].arr;
+  assert.equal(bestRTF.filter((r) => r === "d1").length, 1);
+  assert.equal(bestRTF.filter((r) => r === "d2").length, 0);
+  assert.equal(bestRTF.filter((r) => r === "d3").length, 2);
+  assert.equal(bestRTF.filter((r) => r === "d4").length, 1);
+  for (let i = 1; i < 7; i++) {
+    if (bestRTF[i] === "d3") assert.notEqual(bestRTF[i - 1], "d3", "separa los dos running");
+  }
+
+  // Semana de 3 sesiones
+  const t3 = { d1: 1, d2: 0, d3: 1, d4: 1 };
+  const best3 = rankPlans(OFFICE, {}, 0, NONE, null, null, null, null, t3)[0].arr;
+  assert.equal(best3.filter(Boolean).length, 3);
+
+  // Semana de 5 sesiones (incluyendo 2× d3)
+  const t5 = { d1: 1, d2: 1, d3: 2, d4: 1 };
+  const best5 = rankPlans(HOME, {}, 0, HOME, null, null, null, null, t5)[0].arr;
+  assert.equal(best5.filter(Boolean).length, 5);
+  assert.equal(best5.filter((r) => r === "d3").length, 2);
+  best5.forEach((r, i) => {
+    assert.ok(!(r === "d3" && best5[i - 1] === "d2"), "nunca correr tras pierna");
+    if (r) assert.notEqual(r, best5[i - 1], "evita repetir rutina seguida en semana de 5");
+  });
+});
+
+test("scorePlan penaliza fuertemente repetir fuerza seguida y también prefiere separar running seguido", () => {
+  const targetsFull = { d1: 0, d2: 0, d3: 0, d4: 2 };
+  const stackedStrength = scorePlan(["d4", "d4", null, null, null, null, null], HOME, HOME, null, null, null, null, targetsFull);
+  const spacedStrength = scorePlan(["d4", null, "d4", null, null, null, null], HOME, HOME, null, null, null, null, targetsFull);
+  assert.ok(stackedStrength - spacedStrength >= 40, "repetir fuerza seguida debe penalizar fuerte");
+
+  const targetsRun = { d1: 0, d2: 0, d3: 2, d4: 0 };
+  const stackedRun = scorePlan(["d3", "d3", null, null, null, null, null], HOME, HOME, null, null, null, null, targetsRun);
+  const spacedRun = scorePlan(["d3", null, "d3", null, null, null, null], HOME, HOME, null, null, null, null, targetsRun);
+  assert.ok(stackedRun - spacedRun >= 20, "repetir running seguido debe preferir separarse");
+
+  // También considera continuidad con domingo de la semana anterior
+  const afterSundayD4 = scorePlan(["d4", null, null, null, null, null, null], HOME, HOME, null, null, { r1: "d4" }, null, { d1: 0, d2: 0, d3: 0, d4: 1 });
+  const freshMondayD4 = scorePlan(["d4", null, null, null, null, null, null], HOME, HOME, null, null, null, null, { d1: 0, d2: 0, d3: 0, d4: 1 });
+  assert.ok(afterSundayD4 - freshMondayD4 >= 40);
+});
+
+test("conteo parcial tras completar 1 de 2 sesiones del mismo tipo (vía log y vía Fitbit)", () => {
+  const targets = { d1: 0, d2: 0, d3: 2, d4: 2 };
+  const weekPlan = {
+    [MK]: {
+      office: HOME,
+      night: HOME,
+      targets,
+      plan: ["d3", null, "d4", null, "d3", "d4", null],
+    },
+  };
+
+  // 1 de 2 Running completado por log
+  const wsLog1 = weekState(weekPlan, { "2026-11-09": { r: "d3" } }, MK, [], null, { today: "2026-11-10" });
+  assert.equal(wsLog1.totalTarget, 4);
+  assert.equal(wsLog1.doneCount, 1);
+  assert.deepEqual(wsLog1.remainingTargets, { d1: 0, d2: 0, d3: 1, d4: 2 });
+  assert.equal(wsLog1.arr[0], "d3");
+  assert.equal(wsLog1.arr[4], "d3", "mantiene la 2.ª sesión de running pendiente");
+  assert.equal(wsLog1.arr.filter((r) => r === "d3").length, 2);
+
+  // 2 de 2 Running completados (1 log + 1 Fitbit) y 1 de 2 Full Body vía Fitbit
+  const wsFit = weekState(
+    weekPlan,
+    { "2026-11-09": { r: "d3" } },
+    MK,
+    [
+      at(11, 7, "strength", 40, "Fuerza"), // miércoles -> cubre 1.º d4
+      at(13, 7, "run", 35, "Correr"),      // viernes -> cubre 2.º d3
+      at(15, 7, "run", 30, "Correr"),      // domingo -> 3.º run no suma extra sobre meta de 2
+    ],
+    null,
+    { today: "2026-11-15" },
+  );
+  assert.equal(wsFit.fromFitbit[2], "d4");
+  assert.equal(wsFit.fromFitbit[4], "d3");
+  assert.equal(wsFit.fromFitbit[6], undefined, "un 3.º run no excede la meta de 2");
+  assert.equal(wsFit.doneCount, 3);
+  assert.deepEqual(wsFit.remainingTargets, { d1: 0, d2: 0, d3: 0, d4: 1 });
+
+  // fitbitSession directo con targets repetidos
+  assert.equal(fitbitSession("run", null, ["d3"], targets), "d3");
+  assert.equal(fitbitSession("run", null, ["d3", "d3"], targets), null);
+  assert.equal(fitbitSession("strength", null, ["d4"], targets), "d4");
+  assert.equal(fitbitSession("strength", null, ["d4", "d4"], targets), null);
+
+  // Si hizo la 1.ª d3 el martes en lugar del lunes, conserva la del viernes y no deja lunes como atrasada
+  const wsShifted = weekState(weekPlan, { "2026-11-10": { r: "d3" } }, MK, [], null, { today: "2026-11-10" });
+  assert.equal(wsShifted.arr[0], null);
+  assert.equal(wsShifted.arr[1], "d3");
+  assert.equal(wsShifted.arr[4], "d3");
+});
+
+test("applyWeekTargets: solo esta semana vs próximas semanas sin tocar días completados", () => {
+  const nextMk = "2026-11-16";
+  const log = { "2026-11-09": { r: "d1" } }; // lunes ya hecho
+
+  // Solo esta semana (applyFuture: false)
+  const onlyThis = applyWeekTargets({}, MK, { d1: 1, d2: 0, d3: 2, d4: 1 }, { applyFuture: false, log, today: "2026-11-10" });
+  const wsThis = weekState(onlyThis, log, MK, [], null, { today: "2026-11-10" });
+  assert.equal(wsThis.arr[0], "d1", "conserva el lunes completado");
+  assert.deepEqual(wsThis.targets, { d1: 1, d2: 0, d3: 2, d4: 1 });
+  assert.deepEqual(wsThis.defaultTargets, DEFAULT_WEEK_TARGETS);
+  assert.equal(wsThis.arr.slice(1).filter((r) => r === "d3").length, 2);
+  assert.equal(wsThis.arr.slice(1).filter((r) => r === "d4").length, 1);
+
+  const wsNextDefault = weekState(onlyThis, log, nextMk, [], null, { today: "2026-11-16" });
+  assert.deepEqual(wsNextDefault.targets, DEFAULT_WEEK_TARGETS, "el lunes siguiente vuelve a defaultTargets");
+
+  // También en próximas semanas (applyFuture: true)
+  const alsoFuture = applyWeekTargets({}, MK, { d1: 0, d2: 0, d3: 2, d4: 2 }, { applyFuture: true, log, today: "2026-11-10" });
+  const wsNextInherited = weekState(alsoFuture, log, nextMk, [], null, { today: "2026-11-16" });
+  assert.deepEqual(wsNextInherited.targets, { d1: 0, d2: 0, d3: 2, d4: 2 });
+  assert.deepEqual(wsNextInherited.defaultTargets, { d1: 0, d2: 0, d3: 2, d4: 2 });
+  assert.equal(wsNextInherited.arr.filter((r) => r === "d3").length, 2);
+  assert.equal(wsNextInherited.arr.filter((r) => r === "d4").length, 2);
+});
+
+test("BevelAdjustment respeta conteos configurados con sesiones repetidas", () => {
+  const targets = { d1: 0, d2: 0, d3: 2, d4: 2 };
+  const weekPlan = {
+    [MK]: {
+      office: HOME,
+      night: HOME,
+      targets,
+      plan: ["d3", "d4", null, "d3", null, "d4", null],
+    },
+  };
+  const log = { "2026-11-09": { r: "d3" } }; // lunes ya hecho
+  const lowBevel = {
+    date: "2026-11-10",
+    recovery: { score: 24, zone: "low", alert: null },
+    strain: { score: 5, target: { min: 15, max: 35, label: "Suave" } },
+  };
+  const wsLow = weekState(weekPlan, log, MK, [], null, { today: "2026-11-10", bevelDay: lowBevel });
+  assert.equal(wsLow.arr[0], "d3", "lunes completado intacto");
+  assert.equal(wsLow.arr[1], "low", "martes pasa a Modo Baja Energía");
+  assert.equal(wsLow.arr.slice(2).filter((r) => r === "d4").length, 2, "conserva las 2 sesiones de Full Body");
+  assert.equal(wsLow.arr.slice(2).filter((r) => r === "d3").length, 1, "conserva el 2.º Running pendiente");
+  assert.equal(wsLow.bevelAdjustment.applied, true);
+  assert.equal(wsLow.bevelAdjustment.originalCode, "d4");
+  assert.ok(wsLow.bevelAdjustment.movedToDate > "2026-11-10");
+
+  // Recuperación media: separa martes (d4) pegado al lunes (d3) sin perder sesiones
+  const midBevel = {
+    date: "2026-11-10",
+    recovery: { score: 50, zone: "mid", alert: null },
+    strain: { score: 10, target: { min: 35, max: 60, label: "Moderado" } },
+  };
+  const wsMid = weekState(weekPlan, log, MK, [], null, { today: "2026-11-10", bevelDay: midBevel });
+  assert.equal(wsMid.arr[0], "d3");
+  assert.equal(wsMid.arr[1], null);
+  assert.equal(wsMid.arr.filter((r) => r === "d4").length, 2);
+  assert.equal(wsMid.arr.filter((r) => r === "d3").length, 2);
+  assert.equal(wsMid.bevelAdjustment.action, "unstack");
+});
+
+test("retrocompatibilidad completa cuando weekPlan no trae targets", () => {
+  const legacy = { [MK]: { office: OFFICE, night: NONE, plan: ["d1", "d2", null, "d3", null, "d4", null] } };
+  const ws = weekState(legacy, { "2026-11-09": { r: "d1" } }, MK, [], null, { today: "2026-11-10" });
+  assert.deepEqual(ws.targets, DEFAULT_WEEK_TARGETS);
+  assert.deepEqual(ws.defaultTargets, DEFAULT_WEEK_TARGETS);
+  assert.equal(ws.totalTarget, 4);
+  assert.equal(ws.doneCount, 1);
+  assert.deepEqual(ws.remainingTargets, { d1: 0, d2: 1, d3: 1, d4: 1 });
+  assert.deepEqual(ws.arr, ["d1", "d2", null, "d3", null, "d4", null]);
+});

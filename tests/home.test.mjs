@@ -38,6 +38,44 @@ test("weekProgress cuenta días con entreno libre sin duplicar si ya hay rutina 
   assert.equal(p.sessions.value, 2);
 });
 
+test("weekProgress soporta metas flexibles (3, 4 con repetición y 5 sesiones)", () => {
+  // 2 Full (d4) + 2 Run (d3): 1.ª y 2.ª del mismo tipo cuentan ambas
+  const pRep1 = weekProgress({
+    keys,
+    todayIdx: 3,
+    fixed: { 0: "d3", 2: "d3", 3: "d4" },
+    habits: {},
+    habitDefs: defs,
+    workouts: [],
+    targets: { d1: 0, d2: 0, d3: 2, d4: 2 },
+  });
+  assert.deepEqual(pRep1.sessions, { value: 3, goal: 4 });
+
+  // Semana de 3 sesiones
+  const p3 = weekProgress({
+    keys,
+    todayIdx: 4,
+    fixed: { 0: "d1", 2: "d3" },
+    habits: {},
+    habitDefs: defs,
+    workouts: [],
+    targets: { d1: 1, d2: 0, d3: 1, d4: 1 },
+  });
+  assert.deepEqual(p3.sessions, { value: 2, goal: 3 });
+
+  // Semana de 5 sesiones (2× d3 + d1 + d2 + d4)
+  const p5 = weekProgress({
+    keys,
+    todayIdx: 6,
+    fixed: { 0: "d1", 1: "d3", 3: "d2", 4: "d4", 6: "d3" },
+    habits: {},
+    habitDefs: defs,
+    workouts: [],
+    targets: { d1: 1, d2: 1, d3: 2, d4: 1 },
+  });
+  assert.deepEqual(p5.sessions, { value: 5, goal: 5 });
+});
+
 test("todayPlan prioriza lo registrado, luego Fitbit, luego el plan", () => {
   assert.deepEqual(todayPlan({ info: { rid: "d2" }, logged: { r: "d4" } }), { state: "done", rid: "d4" });
   assert.deepEqual(todayPlan({ info: { rid: "d2" }, fromFitbit: "d1" }), { state: "fitbit", rid: "d1" });

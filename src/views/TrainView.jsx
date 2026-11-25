@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { Check, Zap, BatteryLow, Trophy, Watch, Play, Flag, Dumbbell } from "lucide-react";
 import { dkey, pruneDays } from "../lib/dates.js";
 import { usePersisted } from "../lib/storage.js";
+import { MAIN, DEFAULT_WEEK_TARGETS, countMainCodes } from "../lib/planner.js";
 import { getLastExerciseLog, resolveDefaultSet, recordSet, removeSet, updateExerciseLoad } from "../lib/setLog.js";
 import { DEFAULT_RUN_LEVEL, getDisplayRunLevel, undoRunSession, hasInactivityDecay, applyInactivityDecay, recordRunSession } from "../lib/runProgress.js";
 import { MAX_RUN_LEVEL, getRunLevel } from "../data/runPlan.js";
@@ -73,15 +74,31 @@ export function TrainView({
   const [workouts] = usePersisted("workouts", []);
   const hasFreeToday = hasFreeWorkout(seriesLog, today);
   const doneToday = log[today]?.r || (hasFreeToday ? "free" : null);
-  // Recomendación del día: frescura muscular + recuperación + lo ya hecho esta semana.
+  // Recomendación del día: frescura muscular + recuperación + metas flexibles de esta semana.
   const plannedRid = wp.arr[wp.todayIdx] || null;
+  const weekTargets = wp.targets || DEFAULT_WEEK_TARGETS;
+  const weekDoneCounts = useMemo(() => countMainCodes(wp.fixed), [wp.fixed]);
+  const weekTotalTarget = wp.totalTarget || 4;
+  const weekDoneCount = wp.doneCount ?? MAIN.reduce((acc, c) => acc + Math.min(weekDoneCounts[c] || 0, weekTargets[c] || 0), 0);
   const rec = useMemo(() => {
     const { groups } = muscleGroups(seriesLog, today, { log, workouts, customExercises, soreness });
     const r = bevelHistory?.byDate?.[today]?.recovery;
     const recovery = r && r.mode !== "missing" && typeof r.score === "number" ? r.score : null;
-    const weekDone = (wp.keys || []).filter((k) => k < today).map((k) => log[k]?.r).filter(Boolean);
-    return recommendTraining({ groups, recovery, plannedRid, doneToday, weekDone, routineVariants, setLog: seriesLog, today });
-  }, [seriesLog, log, workouts, customExercises, soreness, bevelHistory, today, plannedRid, doneToday, wp.keys, routineVariants]);
+    // Solo marca como ya cubiertas las rutinas cuya meta semanal ya llegó a 0 (soporta 2× o 3× de la misma rutina).
+    const priorCounts = countMainCodes(
+      (wp.keys || []).filter((k) => k < today).map((k, idx) => log[k]?.r || wp.fromFitbit?.[idx]).filter(Boolean),
+    );
+    const effectiveWeekDone = [];
+    for (const c of MAIN) {
+      const target = weekTargets[c] || 0;
+      const doneBefore = priorCounts[c] || 0;
+      if (target === 0) effectiveWeekDone.push(c);
+      else if (doneBefore >= target) {
+        for (let n = 0; n < doneBefore - target + 1; n++) effectiveWeekDone.push(c);
+      }
+    }
+    return recommendTraining({ groups, recovery, plannedRid, doneToday, weekDone: effectiveWeekDone, routineVariants, setLog: seriesLog, today });
+  }, [seriesLog, log, workouts, customExercises, soreness, bevelHistory, today, plannedRid, doneToday, wp.keys, wp.fromFitbit, weekTargets, routineVariants]);
   const [rid, setRid] = useState(() => initialRid || log[dkey()]?.r || (hasFreeWorkout(seriesLog, dkey()) ? "free" : null) || (rec && rec.rid) || plannedRid || wp.nextRid || "d1");
   const [swapFor, setSwapFor] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -401,10 +418,21 @@ export function TrainView({
         <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
           {ROUTINES.map((r) => {
             const chipRoutine = routineById(r.id, activeRunLevel, resolveVariantId(r.id, routineVariants));
+            const targetCount = MAIN.includes(r.id) ? (weekTargets[r.id] || 0) : 0;
+            const doneCount = MAIN.includes(r.id) ? (weekDoneCounts[r.id] || 0) : 0;
             return (
               <button key={r.id} data-routine-chip onClick={() => setRid(r.id)} aria-pressed={r.id === rid}
                 className={`shrink-0 rounded-2xl px-3.5 py-2.5 text-left transition ${r.id === rid ? (r.low ? "bg-cool/15 ring-1 ring-inset ring-cool/45" : "bg-accent/15 ring-1 ring-inset ring-accent/45") : "bg-white/[0.06] hover:bg-white/[0.1]"}`}>
-                <div className={`flex items-center gap-1 text-xs font-medium ${r.id === rid ? (r.low ? "text-cool" : "text-accent") : "text-muted"}`}>{r.low && <BatteryLow size={12} />}{r.short}{log[today]?.r === r.id && <Check size={12} />}</div>
+                <div className={`flex items-center gap-1 text-xs font-medium ${r.id === rid ? (r.low ? "text-cool" : "text-accent") : "text-muted"}`}>
+                  {r.low && <BatteryLow size={12} />}
+                  {r.short}
+                  {targetCount > 1 && (
+                    <span className={`ml-0.5 rounded-full px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums ${doneCount >= targetCount ? "bg-good/20 text-good" : "bg-white/[0.1] text-fg/85"}`}>
+                      {doneCount}/{targetCount}
+                    </span>
+                  )}
+                  {log[today]?.r === r.id && <Check size={12} />}
+                </div>
                 <div className="whitespace-nowrap text-sm font-medium">{r.low ? (chipRoutine.variantId === "trx_upper" ? "Torso Correas · 20 min" : "Baja energía · 20 min") : chipRoutine.name}</div>
               </button>
             );
@@ -445,7 +473,10 @@ export function TrainView({
             <Card glow={logged && logged.r === rid ? "good" : routine.low ? "cool" : "accent"}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[13px] font-medium text-muted">{routine.short} · ~{routine.minutes} min · Semana {week} {bw.label}</div>
+              <div className="text-[13px] font-medium text-muted">
+                {routine.short} · ~{routine.minutes} min · Semana {week} {bw.label} · {weekDoneCount}/{weekTotalTarget} sesiones
+                {MAIN.includes(rid) && (weekTargets[rid] || 0) > 1 ? ` · ${weekDoneCounts[rid] || 0}/${weekTargets[rid]} de esta rutina` : ""}
+              </div>
               <h1 className="mt-0.5 text-[30px] font-bold leading-tight tracking-tight sm:text-[34px]">{routine.name}</h1>
               <p className="mt-1 max-w-prose text-sm text-muted">{routine.focus}</p>
               {rid === "d3" && (

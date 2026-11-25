@@ -11,8 +11,104 @@ export const TAG = { d1: "TOR", d2: "PIE", d3: "RUN", d4: "FUL", low: "RES" };
 
 export const DEFAULT_OFFICE = [true, false, true, true, true, false, false]; // Lun…Dom: true = voy a la oficina
 
+export const DEFAULT_WEEK_TARGETS = { d1: 1, d2: 1, d3: 1, d4: 1 };
+
+export const WEEK_TARGET_PRESETS = [
+  { id: "classic", label: "Clásica", detail: "1-1-1-1", targets: { d1: 1, d2: 1, d3: 1, d4: 1 } },
+  { id: "full_run", label: "2 Full + 2 Run", detail: "2× Full · 2× Run", targets: { d1: 0, d2: 0, d3: 2, d4: 2 } },
+  { id: "run_torso_full", label: "2 Run + Torso + Full", detail: "2× Run · Torso · Full", targets: { d1: 1, d2: 0, d3: 2, d4: 1 } },
+];
+
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const STRENGTH_CODES = new Set(["d1", "d2", "d4"]);
+
 // Prioridad de carga para favorecer sesiones exigentes cuando la recuperación es alta.
 const SESSION_PRIORITY = { d2: 4, d4: 3, d3: 2, d1: 1 };
+
+function parseTargetCount(val) {
+  if (val == null || val === "" || typeof val === "boolean") return 0;
+  const n = Number(val);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(7, Math.floor(n)));
+}
+
+export function normalizeWeekTargets(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { ...DEFAULT_WEEK_TARGETS };
+  }
+  const out = {};
+  let sum = 0;
+  for (const c of MAIN) {
+    const v = parseTargetCount(raw[c]);
+    out[c] = v;
+    sum += v;
+  }
+  if (sum < 1) return { ...DEFAULT_WEEK_TARGETS };
+  if (sum > 7) {
+    let remaining = 7;
+    for (const c of MAIN) {
+      out[c] = Math.min(out[c], remaining);
+      remaining -= out[c];
+    }
+  }
+  return out;
+}
+
+export function sumTargets(targets) {
+  const norm = normalizeWeekTargets(targets);
+  return MAIN.reduce((acc, c) => acc + norm[c], 0);
+}
+
+export function countMainCodes(items) {
+  const counts = { d1: 0, d2: 0, d3: 0, d4: 0 };
+  const list = Array.isArray(items) ? items : Object.values(items || {});
+  for (const r of list) {
+    if (r && Object.prototype.hasOwnProperty.call(counts, r)) counts[r] += 1;
+  }
+  return counts;
+}
+
+export function computeRemainingTargets(targets, doneItems) {
+  const norm = normalizeWeekTargets(targets);
+  const doneCounts = countMainCodes(doneItems);
+  const rem = {};
+  for (const c of MAIN) {
+    rem[c] = Math.max(0, norm[c] - doneCounts[c]);
+  }
+  return rem;
+}
+
+export function resolveDefaultTargets(weekPlan, mk = null) {
+  if (weekPlan && typeof weekPlan === "object" && weekPlan.defaultTargets) {
+    return normalizeWeekTargets(weekPlan.defaultTargets);
+  }
+  if (weekPlan && typeof weekPlan === "object") {
+    const lastDefKey = Object.keys(weekPlan)
+      .filter((k) => DATE_KEY_RE.test(k) && (!mk || k <= mk) && weekPlan[k] && weekPlan[k].defaultTargets)
+      .sort()
+      .pop();
+    if (lastDefKey) return normalizeWeekTargets(weekPlan[lastDefKey].defaultTargets);
+  }
+  return { ...DEFAULT_WEEK_TARGETS };
+}
+
+export function resolveWeekTargets(weekPlan, mk) {
+  const stored = weekPlan && typeof weekPlan === "object" ? weekPlan[mk] : null;
+  if (stored && stored.targets) return normalizeWeekTargets(stored.targets);
+  return resolveDefaultTargets(weekPlan, mk);
+}
+
+function pruneWeekPlan(all, maxWeeks = 8) {
+  const src = all && typeof all === "object" ? all : {};
+  const dateEntries = Object.fromEntries(
+    Object.entries(src).filter(([k]) => DATE_KEY_RE.test(k)),
+  );
+  const pruned = pruneDays(dateEntries, maxWeeks);
+  if (src.defaultTargets) {
+    pruned.defaultTargets = normalizeWeekTargets(src.defaultTargets);
+  }
+  return pruned;
+}
 
 export function normalizeBevelSignal(bevelInput, dateKey = null) {
   if (!bevelInput || typeof bevelInput !== "object") return null;
@@ -59,7 +155,7 @@ export const isEvening = (office, night, i) => !!(night && night[i] && office[i]
 // tail: los dos últimos días de la semana anterior ({ r1: domingo, r2: sábado, effort1, eve1 }).
 // Así el lunes no se planea «en blanco»: si el domingo hubo pierna o deporte fuerte, cuenta como el día anterior.
 // bevelOpts (opcional): { todayIdx, zone, biometricsOff } para modular la puntuación de hoy según recuperación.
-export function scorePlan(arr, office, night, effort, exam, tail, bevelOpts = null) {
+export function scorePlan(arr, office, night, effort, exam, tail, bevelOpts = null, targets = DEFAULT_WEEK_TARGETS) {
   const t = tail || {};
   const P = (j) => (j >= 0 ? arr[j] : j === -1 ? t.r1 || null : j === -2 ? t.r2 || null : null);
   const E = (j) => (j >= 0 ? !!(effort && effort[j]) : j === -1 ? !!t.effort1 : false);
@@ -86,6 +182,10 @@ export function scorePlan(arr, office, night, effort, exam, tail, bevelOpts = nu
       if (r === "d3" && prev === "d4") s += 12; // full body también carga piernas
       if (r === "d2" && prev === "d3") s += 8; // pierna con las piernas del trote
       if ((r === "d4" && prev === "d2") || (r === "d2" && prev === "d4")) s += 6;
+      if (r === prev && MAIN.includes(r)) {
+        // Evitar repetir la misma rutina en días consecutivos (especialmente fuerza repetida; también preferir separar running).
+        s += STRENGTH_CODES.has(r) ? 45 : 24;
+      }
       if (P(i - 2)) s += 8; // tres días seguidos
     }
   }
@@ -105,25 +205,67 @@ export function scorePlan(arr, office, night, effort, exam, tail, bevelOpts = nu
       }
     }
   }
-  s += MAIN.filter((m) => !arr.includes(m)).length * 100; // sesión que no cabe
+  const normTargets = normalizeWeekTargets(targets);
+  const counts = countMainCodes(arr);
+  let missing = 0;
+  for (const m of MAIN) {
+    if (counts[m] < normTargets[m]) missing += normTargets[m] - counts[m];
+  }
+  s += missing * 100; // sesión que no cabe
   return s;
 }
 
-// Todas las formas de colocar las sesiones pendientes en los días libres desde fromIdx, de mejor a peor.
-export function rankPlans(office, fixed, fromIdx, night, effort, exam, tail, bevelOpts = null) {
-  const done = Object.values(fixed);
-  const left = MAIN.filter((m) => !done.includes(m));
+// Todas las formas únicas de colocar las sesiones pendientes (multiset) en los días libres desde fromIdx, de mejor a peor.
+export function rankPlans(office, fixed, fromIdx, night, effort, exam, tail, bevelOpts = null, targets = DEFAULT_WEEK_TARGETS) {
+  const normTargets = normalizeWeekTargets(targets);
+  const rem = computeRemainingTargets(normTargets, fixed);
+  const totalRem = MAIN.reduce((acc, c) => acc + rem[c], 0);
   const free = [];
-  for (let i = fromIdx; i < 7; i++) if (!fixed[i]) free.push(i);
+  const start = Math.max(0, fromIdx || 0);
+  for (let i = start; i < 7; i++) if (!(fixed && fixed[i])) free.push(i);
   const base = Array(7).fill(null);
-  Object.keys(fixed).forEach((i) => { base[i] = fixed[i]; });
+  Object.keys(fixed || {}).forEach((i) => { base[i] = fixed[i]; });
+
   const out = [];
-  const rec = (si, arr) => {
-    if (si === left.length) { out.push({ arr: arr.slice(), score: scorePlan(arr, office, night, effort, exam, tail, bevelOpts) }); return; }
-    for (const d of free) if (!arr[d]) { arr[d] = left[si]; rec(si + 1, arr); arr[d] = null; }
-    rec(si + 1, arr);
+  const generate = (targetPlace) => {
+    const arr = base.slice();
+    const left = { ...rem };
+    let foundValid = false;
+    const rec = (dayPos, toPlace) => {
+      if (dayPos === free.length) {
+        const score = scorePlan(arr, office, night, effort, exam, tail, bevelOpts, normTargets);
+        if (score < 900) foundValid = true;
+        out.push({ arr: arr.slice(), score });
+        return;
+      }
+      const d = free[dayPos];
+      const daysLeft = free.length - dayPos;
+      if (daysLeft > toPlace) {
+        arr[d] = null;
+        rec(dayPos + 1, toPlace);
+      }
+      if (toPlace > 0) {
+        for (const c of MAIN) {
+          if (left[c] > 0) {
+            left[c] -= 1;
+            arr[d] = c;
+            rec(dayPos + 1, toPlace - 1);
+            arr[d] = null;
+            left[c] += 1;
+          }
+        }
+      }
+    };
+    rec(0, targetPlace);
+    return foundValid;
   };
-  rec(0, base);
+
+  const maxPlaceable = Math.min(totalRem, free.length);
+  let ok = generate(maxPlaceable);
+  // Si colocar todas las sesiones posibles forzó un conflicto grave (p. ej. running tras pierna), evalúa dejando huecos.
+  for (let k = maxPlaceable - 1; !ok && k >= 0; k--) {
+    ok = generate(k);
+  }
   out.sort((a, b) => a.score - b.score || a.arr.join().localeCompare(b.arr.join()));
   return out;
 }
@@ -153,12 +295,15 @@ export function fitbitWeek(workouts, keys) {
   });
 }
 
-// Qué sesión del plan cubre un entreno de Fitbit: la planeada ese día si es del mismo tipo; si no, la siguiente pendiente.
-export function fitbitSession(kind, planned, done) {
-  if (kind === "run") return done.includes("d3") ? null : "d3";
+// Qué sesión del plan cubre un entreno de Fitbit: la planeada ese día si es del mismo tipo y queda pendiente; si no, la siguiente pendiente según targets.
+export function fitbitSession(kind, planned, done, targets = DEFAULT_WEEK_TARGETS) {
+  const norm = normalizeWeekTargets(targets);
+  const doneCounts = countMainCodes(done);
+  const hasRemaining = (code) => (doneCounts[code] || 0) < (norm[code] || 0);
+  if (kind === "run") return hasRemaining("d3") ? "d3" : null;
   if (kind !== "strength") return null;
-  if (planned && STRENGTH_ORDER.includes(planned) && !done.includes(planned)) return planned;
-  return STRENGTH_ORDER.find((r) => !done.includes(r)) || null;
+  if (planned && STRENGTH_ORDER.includes(planned) && hasRemaining(planned)) return planned;
+  return STRENGTH_ORDER.find((r) => hasRemaining(r)) || null;
 }
 
 // Cola de la semana anterior: lo hecho (registro o Fitbit) en sábado y domingo; si esos días todavía no
@@ -190,16 +335,23 @@ function hasBackToBackAt(arr, idx, effort, tail) {
   return prevHeavy || nextHeavy;
 }
 
+function findMovedToIdx(prevArr, nextArr, fromIdx, code) {
+  const fresh = nextArr.findIndex((r, idx) => idx > fromIdx && r === code && prevArr[idx] !== code);
+  if (fresh > fromIdx) return fresh;
+  return nextArr.findIndex((r, idx) => idx > fromIdx && r === code);
+}
+
 /**
  * Aplica ajuste opcional basado en el estado Bevel del día (`recovery` y `strain`)
  * sobre el plan de la semana en curso sin sobrescribir sesiones ya completadas ni romper reglas de calendario.
  */
-export function applyBevelAdjustment({ arr, keys, office, night, fixed, effort, exam, tail, todayIdx, bevel }) {
+export function applyBevelAdjustment({ arr, keys, office, night, fixed, effort, exam, tail, todayIdx, bevel, targets = DEFAULT_WEEK_TARGETS }) {
   const signal = normalizeBevelSignal(bevel, todayIdx >= 0 && todayIdx < 7 ? keys[todayIdx] : null);
   if (!signal || todayIdx < 0 || todayIdx > 6) {
     return { arr, bevelAdjustment: null };
   }
 
+  const normTargets = normalizeWeekTargets(targets);
   const { recoveryScore, zone, biometricsOff, targetStrain } = signal;
   const baseMeta = { recoveryScore, zone, targetStrain, biometricsOff };
   const originalCode = arr[todayIdx] || null;
@@ -237,12 +389,12 @@ export function applyBevelAdjustment({ arr, keys, office, night, fixed, effort, 
       };
     }
 
-    const rescheduled = pickBestValid(rankPlans(office, fixed, todayIdx + 1, night, effort, exam, tail));
+    const rescheduled = pickBestValid(rankPlans(office, fixed, todayIdx + 1, night, effort, exam, tail, null, normTargets));
     const nextArr = rescheduled ? rescheduled.arr.slice() : arr.slice();
     const recommendedCode = biometricsOff ? null : "low";
     nextArr[todayIdx] = recommendedCode;
 
-    const movedToIdx = nextArr.findIndex((r, idx) => idx > todayIdx && r === originalCode);
+    const movedToIdx = findMovedToIdx(arr, nextArr, todayIdx, originalCode);
     const movedToDate = movedToIdx > todayIdx ? keys[movedToIdx] : null;
     const origName = routineById(originalCode).name;
     const movedText = movedToIdx > todayIdx
@@ -290,7 +442,7 @@ export function applyBevelAdjustment({ arr, keys, office, night, fixed, effort, 
 
     if (hasBackToBackAt(arr, todayIdx, effort, tail)) {
       const bevelOpts = { todayIdx, zone: "mid", biometricsOff: false };
-      const ranked = rankPlans(office, fixed, todayIdx, night, effort, exam, tail, bevelOpts);
+      const ranked = rankPlans(office, fixed, todayIdx, night, effort, exam, tail, bevelOpts, normTargets);
       const curMain = countMain(arr);
       const cand = ranked.find((p) => (
         p.score < 900
@@ -300,7 +452,7 @@ export function applyBevelAdjustment({ arr, keys, office, night, fixed, effort, 
 
       if (cand && cand.arr.join() !== arr.join()) {
         const nextArr = cand.arr.slice();
-        const movedToIdx = nextArr.findIndex((r, idx) => idx > todayIdx && r === originalCode);
+        const movedToIdx = findMovedToIdx(arr, nextArr, todayIdx, originalCode);
         const recommendedCode = nextArr[todayIdx] || null;
         return {
           arr: nextArr,
@@ -334,16 +486,17 @@ export function applyBevelAdjustment({ arr, keys, office, night, fixed, effort, 
   }
 
   // 3. Recuperación alta (67–100%): favorecer sesión de mayor prioridad/carga si había una diferida o una más exigente pendiente.
+  const arrCounts = countMainCodes(arr);
   const hasDeferred = arr.some((r, i) => r && MAIN.includes(r) && i < todayIdx && !fixed[i])
-    || MAIN.some((m) => !arr.includes(m) && !Object.values(fixed || {}).includes(m));
+    || MAIN.some((m) => arrCounts[m] < normTargets[m]);
   const todayPrio = originalCode ? (SESSION_PRIORITY[originalCode] || 0) : 0;
   const hasHigherLater = arr.some((r, i) => i > todayIdx && !fixed[i] && (SESSION_PRIORITY[r] || 0) > todayPrio);
 
   if ((hasDeferred || (originalCode && hasHigherLater)) && !(exam && exam[todayIdx] && !originalCode)) {
     const bevelOpts = { todayIdx, zone: "high", biometricsOff: false };
-    const curScore = scorePlan(arr, office, night, effort, exam, tail, bevelOpts);
+    const curScore = scorePlan(arr, office, night, effort, exam, tail, bevelOpts, normTargets);
     const curMain = countMain(arr);
-    const ranked = rankPlans(office, fixed, todayIdx, night, effort, exam, tail, bevelOpts);
+    const ranked = rankPlans(office, fixed, todayIdx, night, effort, exam, tail, bevelOpts, normTargets);
     const cand = ranked.find((p) => {
       if (p.score >= 900 || countMain(p.arr) < curMain) return false;
       const candToday = p.arr[todayIdx];
@@ -387,30 +540,57 @@ export function applyBevelAdjustment({ arr, keys, office, night, fixed, effort, 
 export function weekState(weekPlan, log, mk, workouts, calBusy, opts = {}) {
   const keys = Array.from({ length: 7 }, (_, i) => dkey(addDays(fromKey(mk), i)));
   const stored = (weekPlan || {})[mk];
-  const lastKey = Object.keys(weekPlan || {}).filter((k) => k <= mk && weekPlan[k] && weekPlan[k].office).sort().pop();
+  const lastKey = Object.keys(weekPlan || {})
+    .filter((k) => DATE_KEY_RE.test(k) && k <= mk && weekPlan[k] && weekPlan[k].office)
+    .sort()
+    .pop();
   const office = (stored && stored.office) || (lastKey && weekPlan[lastKey].office) || DEFAULT_OFFICE;
   // Noches: lo que marcaste esta semana manda; si no tocaste nada, se sugiere desde Google Calendar (sin datos = ocupada).
   // Las marcas no se heredan de otra semana.
   const night = (stored && Array.isArray(stored.night) && stored.night) || calNight(calBusy, keys);
   const exam = calExamSoon(calBusy, keys);
   const tail = opts.noTail ? null : weekTail(weekPlan, log, mk, workouts, calBusy, opts.today);
+  const defaultTargets = resolveDefaultTargets(weekPlan, mk);
+  const targets = opts.targets ? normalizeWeekTargets(opts.targets) : resolveWeekTargets(weekPlan, mk);
+  const totalTarget = sumTargets(targets);
+
   const fixed = {};
-  keys.forEach((k, i) => { if (log[k]) fixed[i] = log[k].r; });
+  keys.forEach((k, i) => { if (log && log[k]) fixed[i] = log[k].r; });
   const fit = fitbitWeek(workouts, keys);
   const effort = fit.map((f) => !!(f && f.effort));
   const fromFitbit = {};
   fit.forEach((f, i) => {
     if (!f || !f.session || fixed[i]) return;
     const planned = stored && Array.isArray(stored.plan) ? stored.plan[i] : null;
-    const r = fitbitSession(f.session.kind, planned, Object.values(fixed));
+    const r = fitbitSession(f.session.kind, planned, Object.values(fixed), targets);
     if (r) { fixed[i] = r; fromFitbit[i] = r; }
   });
+
+  const doneCounts = countMainCodes(fixed);
+  const remainingTargets = computeRemainingTargets(targets, fixed);
+  const doneCount = MAIN.reduce((acc, c) => acc + Math.min(doneCounts[c], targets[c]), 0);
+
   let arr;
   if (stored && Array.isArray(stored.plan)) {
-    const done = Object.values(fixed);
-    arr = stored.plan.map((r, i) => (r && !fixed[i] && !done.includes(r) ? r : null));
+    const rem = { ...remainingTargets };
+    arr = Array(7).fill(null);
     Object.keys(fixed).forEach((i) => { arr[i] = fixed[i]; });
-  } else arr = rankPlans(office, fixed, 0, night, effort, exam, tail)[0].arr;
+    const todayKey = opts.today || null;
+    const ti = todayKey ? keys.indexOf(todayKey) : -1;
+    const order = ti >= 0
+      ? [...Array.from({ length: 7 - ti }, (_, k) => ti + k), ...Array.from({ length: ti }, (_, k) => k)]
+      : [0, 1, 2, 3, 4, 5, 6];
+    for (const i of order) {
+      if (fixed[i]) continue;
+      const r = stored.plan[i];
+      if (r && MAIN.includes(r) && rem[r] > 0) {
+        arr[i] = r;
+        rem[r] -= 1;
+      }
+    }
+  } else {
+    arr = rankPlans(office, fixed, 0, night, effort, exam, tail, null, targets)[0].arr;
+  }
 
   const bevelInput = opts.bevelDay || opts.bevel || null;
   let bevelAdjustment = null;
@@ -428,12 +608,50 @@ export function weekState(weekPlan, log, mk, workouts, calBusy, opts = {}) {
       tail,
       todayIdx,
       bevel: bevelInput,
+      targets,
     });
     arr = adjusted.arr;
     bevelAdjustment = adjusted.bevelAdjustment;
   }
 
-  return { keys, office, night, fixed, arr, fit, effort, fromFitbit, exam, tail, bevelAdjustment };
+  return {
+    keys,
+    office,
+    night,
+    fixed,
+    arr,
+    fit,
+    effort,
+    fromFitbit,
+    exam,
+    tail,
+    bevelAdjustment,
+    targets,
+    defaultTargets,
+    totalTarget,
+    doneCount,
+    remainingTargets,
+  };
+}
+
+/**
+ * Actualiza la mezcla semanal de sesiones dentro de `weekPlan` (sin tocar días ya completados)
+ * y recalcula el plan desde hoy en adelante.
+ */
+export function applyWeekTargets(weekPlan, mk, nextTargets, { applyFuture = false, log = {}, workouts = [], calBusy = null, today = dkey() } = {}) {
+  const normalized = normalizeWeekTargets(nextTargets);
+  const cur = weekState(weekPlan, log, mk, workouts, calBusy, { targets: normalized, today });
+  const todayIdx = cur.keys.indexOf(today);
+  const fromIdx = todayIdx >= 0 ? todayIdx : 0;
+  const ranked = rankPlans(cur.office, cur.fixed, fromIdx, cur.night, cur.effort, cur.exam, cur.tail, null, normalized);
+  const best = pickBestValid(ranked);
+  const nextPlan = best ? best.arr : cur.arr;
+  const base = { ...(weekPlan || {}) };
+  base[mk] = { office: cur.office, plan: nextPlan, night: cur.night, targets: normalized };
+  if (applyFuture) {
+    base.defaultTargets = normalized;
+  }
+  return pruneWeekPlan(base, 8);
 }
 
 export function useWeekPlan(log, opts = {}) {
@@ -445,30 +663,40 @@ export function useWeekPlan(log, opts = {}) {
   const todayIdx = dayDiff(today, mk);
   const bevel = opts && typeof opts === "object" ? (opts.bevelDay || opts.bevel || (opts.recovery ? opts : null)) : null;
   const ws = useMemo(
-    () => weekState(weekPlan, log, mk, workouts, calBusy, bevel ? { bevel, today } : {}),
+    () => weekState(weekPlan, log, mk, workouts, calBusy, bevel ? { bevel, today } : { today }),
     [weekPlan, log, mk, workouts, calBusy, bevel, today],
   );
 
-  const save = (all, office, plan, night) => pruneDays({ ...(all || {}), [mk]: { office, plan, night } }, 8);
+  const save = (all, office, plan, night) => {
+    const base = { ...(all || {}) };
+    const prevEntry = base[mk];
+    const entry = { office, plan, night };
+    if (prevEntry && prevEntry.targets) entry.targets = normalizeWeekTargets(prevEntry.targets);
+    base[mk] = entry;
+    return pruneWeekPlan(base, 8);
+  };
   // Reacomodar: recoloca lo pendiente de hoy en adelante y, en cada toque, pasa a la siguiente mejor opción.
   const shuffle = () => setWeekPlan((all) => {
-    const cur = weekState(all, log, mk, workouts, calBusy);
-    const ranked = rankPlans(cur.office, cur.fixed, todayIdx, cur.night, cur.effort, cur.exam, cur.tail);
+    const cur = weekState(all, log, mk, workouts, calBusy, { today });
+    const ranked = rankPlans(cur.office, cur.fixed, todayIdx, cur.night, cur.effort, cur.exam, cur.tail, null, cur.targets);
     const ok = ranked.filter((p) => p.score < 1000);
     const pool = (ok.length ? ok : ranked).slice(0, 6);
     const idx = pool.findIndex((p) => p.arr.join() === cur.arr.join());
     return save(all, cur.office, pool[(idx + 1) % pool.length].arr, cur.night);
   });
   const toggleOffice = (i) => setWeekPlan((all) => {
-    const cur = weekState(all, log, mk, workouts, calBusy);
+    const cur = weekState(all, log, mk, workouts, calBusy, { today });
     const office = cur.office.map((v, k) => (k === i ? !v : v));
-    return save(all, office, rankPlans(office, cur.fixed, todayIdx, cur.night, cur.effort, cur.exam, cur.tail)[0].arr, cur.night);
+    return save(all, office, rankPlans(office, cur.fixed, todayIdx, cur.night, cur.effort, cur.exam, cur.tail, null, cur.targets)[0].arr, cur.night);
   });
   const toggleNight = (i) => setWeekPlan((all) => {
-    const cur = weekState(all, log, mk, workouts, calBusy);
+    const cur = weekState(all, log, mk, workouts, calBusy, { today });
     const night = cur.night.map((v, k) => (k === i ? !v : v));
-    return save(all, cur.office, rankPlans(cur.office, cur.fixed, todayIdx, night, cur.effort, cur.exam, cur.tail)[0].arr, night);
+    return save(all, cur.office, rankPlans(cur.office, cur.fixed, todayIdx, night, cur.effort, cur.exam, cur.tail, null, cur.targets)[0].arr, night);
   });
+  const setTargets = (nextTargets, { applyFuture = false } = {}) => setWeekPlan((all) => (
+    applyWeekTargets(all, mk, nextTargets, { applyFuture, log, workouts, calBusy, today })
+  ));
   const dayInfo = (w, m, dateKey) => {
     const i = dayDiff(dateKey, m);
     const rid = w.arr[i] || null;
@@ -479,7 +707,7 @@ export function useWeekPlan(log, opts = {}) {
   };
   const info = (dateKey) => {
     const m = dkey(mondayOf(fromKey(dateKey)));
-    return dayInfo(m === mk ? ws : weekState(weekPlan, log, m, workouts, calBusy), m, dateKey);
+    return dayInfo(m === mk ? ws : weekState(weekPlan, log, m, workouts, calBusy, { today }), m, dateKey);
   };
   // Próximos 14 días (para Google Calendar), calculando cada semana una sola vez.
   const upcoming = useMemo(() => {
@@ -487,14 +715,14 @@ export function useWeekPlan(log, opts = {}) {
     return Array.from({ length: 14 }, (_, n) => {
       const k = dkey(addDays(fromKey(today), n));
       const m = dkey(mondayOf(fromKey(k)));
-      if (!cache[m]) cache[m] = weekState(weekPlan, log, m, workouts, calBusy);
+      if (!cache[m]) cache[m] = weekState(weekPlan, log, m, workouts, calBusy, { today });
       return dayInfo(cache[m], m, k);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws, today, weekPlan, log, workouts, calBusy]);
   const nextRid = ws.arr.slice(todayIdx).find((r, k) => r && !ws.fixed[todayIdx + k]) || null;
   const late = ws.arr.some((r, i) => r && i < todayIdx && !ws.fixed[i]);
-  return { ...ws, todayIdx, shuffle, toggleOffice, toggleNight, info, nextRid, late, upcoming };
+  return { ...ws, todayIdx, shuffle, toggleOffice, toggleNight, setTargets, info, nextRid, late, upcoming };
 }
 
 export function computeStreak(log, setLog = null) {
