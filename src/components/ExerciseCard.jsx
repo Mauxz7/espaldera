@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useId, useMemo } from "react";
-import { X, Check, ChevronDown, Info, ArrowLeftRight, Undo2, History, Pencil, TrendingUp, Maximize2, SkipForward, RotateCcw } from "lucide-react";
+import { X, Check, ChevronDown, Info, ArrowLeftRight, Undo2, History, Pencil, TrendingUp, Maximize2, SkipForward, RotateCcw, Timer } from "lucide-react";
 import { fmtShort } from "../lib/dates.js";
 import { EQ, effSets, effRir } from "../data/program.js";
 import { SUB_KIND, PATTERNS } from "../data/subs.js";
@@ -198,6 +198,7 @@ export function ExerciseCard({
   series = [],
   onSaveSet,
   onFocus,
+  onStartRest,
 }) {
   const [open, setOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
@@ -416,7 +417,20 @@ export function ExerciseCard({
           <Pencil size={12} />
           <span>Editar</span>
         </button>
-        <span className="ml-auto text-xs text-muted">{ex.emom ? "EMOM" : ex.rest ? `Desc. ${ex.rest}s` : "Sin descanso"}</span>
+        {onStartRest && (ex.emom || ex.rest) ? (
+          <button
+            type="button"
+            onClick={() => onStartRest(ex.emom ? 60 : ex.rest)}
+            className="ml-auto inline-flex items-center gap-1 rounded-xl bg-white/[0.06] px-2.5 py-1.5 text-xs font-medium text-muted transition hover:bg-accent/15 hover:text-accent"
+            aria-label={`Iniciar descanso de ${ex.emom ? 60 : ex.rest} segundos`}
+            title="Iniciar temporizador de descanso"
+          >
+            <Timer size={12} />
+            <span>{ex.emom ? "EMOM" : `Desc. ${ex.rest}s`}</span>
+          </button>
+        ) : (
+          <span className="ml-auto text-xs text-muted">{ex.emom ? "EMOM" : ex.rest ? `Desc. ${ex.rest}s` : "Sin descanso"}</span>
+        )}
       </div>
 
       {series.some(Boolean) && (

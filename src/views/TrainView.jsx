@@ -53,6 +53,8 @@ export function TrainView({
   freeSessions: freeSessionsProp,
   setFreeSessions: setFreeSessionsProp,
   soreness: sorenessProp,
+  timer,
+  setTimer,
   startTimer,
   openWarmup,
   wp,
@@ -359,8 +361,8 @@ export function TrainView({
         const keep = Object.keys(next).sort().slice(-21);
         return Object.fromEntries(keep.map((k) => [k, next[k]]));
       });
-      if (ex.rest) startTimer(ex.rest);
       if (ex.emom) startTimer(60);
+      else if (ex.rest) startTimer(ex.rest);
     }
   };
 
@@ -394,8 +396,8 @@ export function TrainView({
       const keep = Object.keys(next).sort().slice(-21);
       return Object.fromEntries(keep.map((k) => [k, next[k]]));
     });
-    if (!was && ex.rest) startTimer(ex.rest);
     if (!was && ex.emom) startTimer(60);
+    else if (!was && ex.rest) startTimer(ex.rest);
   };
 
   const bw = BLOCK_WEEKS[week - 1];
@@ -467,6 +469,7 @@ export function TrainView({
             onMoveExercise={handleMoveFreeExercise}
             onRemoveExercise={handleRemoveFreeExercise}
             onFinish={finish}
+            startTimer={startTimer}
           />
         ) : (
           <>
@@ -574,6 +577,7 @@ export function TrainView({
                   onLoad={(v) => setLoad(ex.id, v)}
                   last={last}
                   onFocus={() => openMode(ex.id)}
+                  onStartRest={startTimer}
                 />
               ))}
             </div>
@@ -587,6 +591,9 @@ export function TrainView({
             items={activeItems}
             startIndex={mode.start}
             session={todaySession}
+            timer={timer}
+            startTimer={startTimer}
+            onClearTimer={setTimer ? () => setTimer(null) : undefined}
             onSaveSet={(it, i, reps, load) => saveSet(it.ex, i, reps, load, it.n)}
             onRemoveSet={(it, i) => toggle(it.ex, i, it.n)}
             onSwap={(exId) => setSwapFor(exId)}

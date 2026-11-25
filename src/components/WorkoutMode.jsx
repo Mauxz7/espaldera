@@ -1,8 +1,16 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Check, ChevronLeft, ChevronRight, ArrowLeftRight, History, TrendingUp, Info, ChevronDown, Minus, Plus, Timer, Flag, Trash2, SkipForward } from "lucide-react";
+import { X, Check, ChevronLeft, ChevronRight, ArrowLeftRight, History, TrendingUp, Info, ChevronDown, Minus, Plus, Timer, Flag, Trash2, SkipForward, Volume2, VolumeX, BellRing } from "lucide-react";
 import { fmtShort } from "../lib/dates.js";
 import { effRir } from "../data/program.js";
 import { nextPendingSet, nextPendingExercise, suggestSet, formatClock } from "../lib/workout.js";
+import {
+  unlockTimerAudio,
+  playTimerDoneChime,
+  playTimerPreviewPing,
+  isTimerSoundEnabled,
+  setTimerSoundEnabled,
+  subscribeTimerSound,
+} from "../lib/timerSound.js";
 import { btnCls } from "./ui.jsx";
 
 // Editor de la serie actual: reps con − / + y carga. Se reinicia (por `key`) al cambiar de serie o de ejercicio.
@@ -48,13 +56,41 @@ function SetEditor({ item, setIndex, isDone, onSave, onRemove }) {
  * Modo entreno a pantalla completa: un ejercicio a la vez.
  * items: [{ ex, view, alt, n, done, series, currentLoad, last, lastLog }] (calculados en TrainView).
  */
-export function WorkoutMode({ routine, week, items, startIndex = 0, session, onSaveSet, onRemoveSet, onSwap, onSkip, onClose, onFinish }) {
+export function WorkoutMode({ routine, week, items, startIndex = 0, session, timer, startTimer, onClearTimer, onSaveSet, onRemoveSet, onSwap, onSkip, onClose, onFinish }) {
   const [idx, setIdx] = useState(() => Math.min(Math.max(0, startIndex), Math.max(0, items.length - 1)));
   const [picked, setPicked] = useState(null); // serie elegida a mano; null = la primera pendiente
-  const [rest, setRest] = useState(null); // { endAt, total } solo para mostrar; el temporizador global suena
+  const [localRest, setLocalRest] = useState(null); // respaldo si no se pasa timer global
+  const [restDoneBanner, setRestDoneBanner] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(() => isTimerSoundEnabled());
+  const [testingSound, setTestingSound] = useState(false);
   const [tips, setTips] = useState(false);
   const [now, setNow] = useState(Date.now());
   const stripRef = useRef(null);
+  const prevGlobalTimerIdRef = useRef(timer ? (timer.id ?? timer.endAt) : null);
+  const dismissedGlobalRestRef = useRef(false);
+  const testTimeoutRef = useRef(null);
+
+  useEffect(() => subscribeTimerSound(setSoundEnabled), []);
+
+  useEffect(() => () => {
+    if (testTimeoutRef.current) clearTimeout(testTimeoutRef.current);
+  }, []);
+
+  // Detecta cuando el temporizador global termina para mostrar «¡Listo!» dentro de Modo entreno.
+  useEffect(() => {
+    const curId = timer ? (timer.id ?? timer.endAt) : null;
+    if (curId != null) {
+      prevGlobalTimerIdRef.current = curId;
+      dismissedGlobalRestRef.current = false;
+      setRestDoneBanner(false);
+    } else if (prevGlobalTimerIdRef.current != null) {
+      prevGlobalTimerIdRef.current = null;
+      if (!dismissedGlobalRestRef.current) {
+        setRestDoneBanner(true);
+      }
+      dismissedGlobalRestRef.current = false;
+    }
+  }, [timer]);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -77,11 +113,18 @@ export function WorkoutMode({ routine, week, items, startIndex = 0, session, onS
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 500);
+    const tick = () => setNow(Date.now());
+    const id = setInterval(tick, 250);
+    const onVisible = () => { if (!document.hidden) tick(); };
     // Escape cierra el modo (salvo que esté abierta la hoja de sustituir o el resumen encima).
     const onKey = (e) => { if (e.key === "Escape" && document.querySelectorAll('[role="dialog"]').length === 1) closeRef.current(); };
+    document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("keydown", onKey);
-    return () => { clearInterval(id); window.removeEventListener("keydown", onKey); };
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("keydown", onKey);
+    };
   }, []);
   useEffect(() => {
     const el = stripRef.current && stripRef.current.querySelector('[aria-current="step"]');
@@ -96,17 +139,65 @@ export function WorkoutMode({ routine, week, items, startIndex = 0, session, onS
   const exerciseDone = setIndex < 0;
   const allDone = items.map((it) => it.done);
   const nextIdx = nextPendingExercise(allDone, idx + 1);
-  const restLeft = rest ? rest.endAt - now : 0;
-  const goTo = (i) => { setIdx(i); setPicked(null); setTips(false); };
+  const usesGlobalTimer = timer !== undefined || typeof startTimer === "function";
+  const activeRest = usesGlobalTimer
+    ? (timer ? { endAt: timer.endAt, total: timer.duration, paused: Boolean(timer.paused), left: timer.left } : null)
+    : localRest;
+  const restLeft = activeRest ? (activeRest.paused ? activeRest.left : Math.max(0, activeRest.endAt - now)) : 0;
+  const showRestCard = Boolean(activeRest) || restDoneBanner;
+  const goTo = (i) => { setIdx(i); setPicked(null); setTips(false); setRestDoneBanner(false); };
   const elapsedMs = session && session.startAt ? Math.max(0, (session.endAt || now) - session.startAt) : null;
   const restSec = ex.emom ? 60 : ex.rest || 0;
   const target = suggestSet({ series, setIndex: exerciseDone ? n - 1 : setIndex, exReps: view.reps, currentLoad: item.currentLoad, lastLog: item.lastLog, last, sets: n });
 
+  const toggleSound = () => {
+    unlockTimerAudio();
+    const next = !soundEnabled;
+    setTimerSoundEnabled(next);
+    if (next) playTimerPreviewPing();
+  };
+
+  const testSound = () => {
+    unlockTimerAudio();
+    playTimerDoneChime({ enabled: true, vibrate: true });
+    setTestingSound(true);
+    if (testTimeoutRef.current) clearTimeout(testTimeoutRef.current);
+    testTimeoutRef.current = setTimeout(() => {
+      setTestingSound(false);
+      testTimeoutRef.current = null;
+    }, 900);
+  };
+
+  const dismissRest = () => {
+    setRestDoneBanner(false);
+    if (usesGlobalTimer) {
+      dismissedGlobalRestRef.current = true;
+      if (onClearTimer) onClearTimer();
+    } else {
+      setLocalRest(null);
+    }
+  };
+
+  const triggerManualRest = (sec) => {
+    if (!sec) return;
+    unlockTimerAudio();
+    setRestDoneBanner(false);
+    if (typeof startTimer === "function") {
+      startTimer(sec);
+    } else {
+      setLocalRest({ endAt: Date.now() + sec * 1000, total: sec * 1000 });
+    }
+  };
+
   const save = (reps, load) => {
+    unlockTimerAudio();
     const wasDone = !!done[setIndex];
+    setRestDoneBanner(false);
     onSaveSet(item, setIndex, reps, load);
     setPicked(null);
-    if (!wasDone && restSec) setRest({ endAt: Date.now() + restSec * 1000, total: restSec * 1000 });
+    if (!wasDone && restSec && !usesGlobalTimer) {
+      setLocalRest({ endAt: Date.now() + restSec * 1000, total: restSec * 1000 });
+    }
   };
 
   return (
@@ -122,6 +213,20 @@ export function WorkoutMode({ routine, week, items, startIndex = 0, session, onS
             <div className="truncate text-[13px] font-medium text-muted">{routine.short} · {routine.name}</div>
             <div className="font-mono text-lg font-bold tabular-nums">{elapsedMs != null ? formatClock(elapsedMs) : "—"}</div>
           </div>
+          <button
+            type="button"
+            onClick={toggleSound}
+            aria-pressed={soundEnabled}
+            aria-label={soundEnabled ? "Silenciar sonido del temporizador" : "Activar sonido del temporizador"}
+            title={soundEnabled ? "Sonido activo" : "Sonido silenciado"}
+            className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl transition ${
+              soundEnabled
+                ? "bg-accent/15 text-accent hover:bg-accent/25"
+                : "bg-white/[0.08] text-muted hover:bg-white/[0.12] hover:text-fg"
+            }`}
+          >
+            {soundEnabled ? <Volume2 size={19} /> : <VolumeX size={19} />}
+          </button>
           <button type="button" onClick={onFinish} className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-2xl bg-good/15 px-3.5 text-sm font-semibold text-good hover:bg-good/25"><Flag size={16} />Terminar</button>
         </div>
 
@@ -153,8 +258,20 @@ export function WorkoutMode({ routine, week, items, startIndex = 0, session, onS
             <div className="min-w-0"><dt className="text-xs font-medium text-muted">Carga</dt><dd className="truncate font-mono text-xl font-bold text-fg">{target.load || "—"}</dd></div>
             <div><dt className="text-xs font-medium text-muted">RIR</dt><dd className="font-mono text-xl font-bold text-fg tabular-nums">{effRir(view, week)}</dd></div>
           </dl>
-          <div className="mt-2 flex flex-wrap gap-x-3 text-xs text-muted">
-            <span>Rango {view.reps}</span><span>Tempo {view.tempo}</span><span>{ex.emom ? "EMOM" : restSec ? `Descanso ${restSec} s` : "Sin descanso"}</span>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+            <span>Rango {view.reps}</span><span>Tempo {view.tempo}</span>
+            {restSec > 0 ? (
+              <button
+                type="button"
+                onClick={() => triggerManualRest(restSec)}
+                className="inline-flex items-center gap-1 rounded-lg bg-white/[0.06] px-2 py-0.5 text-xs font-medium text-muted transition hover:bg-accent/15 hover:text-accent"
+                aria-label={`Iniciar descanso de ${restSec} segundos`}
+              >
+                <Timer size={12} />{ex.emom ? "EMOM · 60 s" : `Descanso ${restSec} s`}
+              </button>
+            ) : (
+              <span>Sin descanso</span>
+            )}
           </div>
           {target.progression && (
             <div className={`mt-2 flex items-start gap-1.5 text-sm ${target.progression.type === "load" ? "text-good" : target.progression.type === "reps" ? "text-accent" : "text-warn"}`}>
@@ -182,18 +299,59 @@ export function WorkoutMode({ routine, week, items, startIndex = 0, session, onS
             })}
           </div>
 
-          {rest && (
-            <div className={`mt-3 rounded-2xl p-3.5 ${restLeft > 0 ? "bg-cool/12" : "bg-good/12"}`} aria-live="polite">
+          {showRestCard && (
+            <div className={`mt-3 rounded-2xl p-3.5 ${restLeft > 0 ? "bg-cool/12" : "bg-good/12 ring-1 ring-inset ring-good/30"}`} aria-live="polite">
               {restLeft > 0 ? (
                 <>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-cool"><Timer size={16} />Descanso</span>
-                    <span className="font-mono text-3xl font-bold tabular-nums">{formatClock(restLeft + 999)}</span>
+                    <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-cool">
+                      <Timer size={16} />{activeRest?.paused ? "Descanso en pausa" : "Descanso"}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-3xl font-bold tabular-nums">{formatClock(restLeft + 999)}</span>
+                      <button
+                        type="button"
+                        onClick={testSound}
+                        aria-label="Probar sonido del temporizador"
+                        title="Probar sonido"
+                        className={`grid h-9 w-9 place-items-center rounded-xl transition ${
+                          testingSound ? "bg-good/20 text-good" : "bg-white/[0.08] text-accent hover:bg-white/[0.14]"
+                        }`}
+                      >
+                        <BellRing size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={dismissRest}
+                        aria-label="Omitir descanso"
+                        title="Omitir descanso"
+                        className="grid h-9 w-9 place-items-center rounded-xl bg-white/[0.08] text-muted hover:bg-white/[0.14] hover:text-fg"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.1]"><div className="h-full rounded-full bg-cool" style={{ width: `${Math.max(0, Math.min(100, (restLeft / rest.total) * 100))}%` }} /></div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.1]">
+                    <div
+                      className="h-full rounded-full bg-cool"
+                      style={{ width: `${Math.max(0, Math.min(100, activeRest?.total ? (restLeft / activeRest.total) * 100 : 0))}%` }}
+                    />
+                  </div>
                 </>
               ) : (
-                <div className="text-sm font-semibold text-good">Descanso terminado. {exerciseDone ? "Pasa al siguiente ejercicio." : "A la siguiente serie."}</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-semibold text-good">
+                    ¡Listo! Descanso terminado. {exerciseDone ? "Pasa al siguiente ejercicio." : "A la siguiente serie."}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={dismissRest}
+                    aria-label="Cerrar aviso de descanso"
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/[0.08] text-good hover:bg-white/[0.14]"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
               )}
             </div>
           )}
