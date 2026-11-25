@@ -759,6 +759,9 @@ export function SettingsView({ habitDefs, setHabitDefs, reminderCard, healthPref
                 <p className="text-xs text-muted">La clave se guarda solo en este dispositivo y solo se envía a GitHub.</p>
               </div>
             )}
+            <p className="mt-3 rounded-2xl bg-white/[0.05] px-3.5 py-2.5 text-xs leading-relaxed text-muted">
+              Activa el permiso <strong className="font-semibold text-fg">Actions: Read and write</strong> en tu token de GitHub para habilitar el botón <strong className="font-semibold text-fg">«Sincronizar Fitbit»</strong> desde la pestaña Salud.
+            </p>
           </Card>
         </div>
         {reminderCard}

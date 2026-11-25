@@ -26,6 +26,7 @@ async function device(tag, token = "tok") {
     write: (k, v, at) => use((m) => { m.LS.set(k, v); m.LS.set("@at:" + k, at); }),
     read: (k) => use((m) => m.LS.get(k)),
     sync: () => use((m) => m.Sync.run()),
+    pullNow: () => use((m) => m.Sync.pullNow()),
     status: () => use((m) => m.Sync.status),
   };
 }
@@ -162,4 +163,24 @@ test("SYNC_KEYS incluye soreness y se sincroniza con retrocompatibilidad", async
   await a.sync();
   await b.sync();
   assert.deepEqual(await b.read("soreness"), sample);
+});
+
+test("Sync.pullNow recarga datos nuevos de Fitbit desde GitHub sin perder ediciones locales", async () => {
+  const workflow = await device("u");
+  const phone = await device("v");
+
+  // El teléfono tiene un hábito editado localmente
+  await phone.write("habits", { "2026-11-24": { agua: true } }, 9000);
+
+  // GitHub Actions escribe sleep y vitals frescos en data.json
+  await workflow.write("sleep", { "2026-11-24": { min: 445, bed: "23:10", wake: "06:40" } }, 9500);
+  await workflow.write("vitals", { "2026-11-24": { hrv: 65, rhr: 52 } }, 9500);
+  await workflow.sync();
+
+  // El teléfono hace pullNow tras completar el workflow
+  const res = await phone.pullNow();
+  assert.equal(res.ok, true);
+  assert.deepEqual(await phone.read("sleep"), { "2026-11-24": { min: 445, bed: "23:10", wake: "06:40" } });
+  assert.deepEqual(await phone.read("vitals"), { "2026-11-24": { hrv: 65, rhr: 52 } });
+  assert.deepEqual(await phone.read("habits"), { "2026-11-24": { agua: true } });
 });
