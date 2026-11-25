@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, Dumbbell, Flag, History, Plus, Trash2, Watch, Zap } from "lucide-react";
+import { ChevronDown, ChevronUp, Dumbbell, Flag, History, Plus, Timer, Trash2, Watch, Zap } from "lucide-react";
 import { fmtShort } from "../lib/dates.js";
 import { parseTargetReps } from "../lib/setLog.js";
 import { MUSCLE_GROUPS, hasFreeWorkout } from "../lib/metrics.js";
 import { buildFreeWorkoutSummary, getLastFreeExerciseLog, resolveFreeExercise } from "../lib/freeWorkout.js";
+import { unlockTimerAudio } from "../lib/timerSound.js";
 import { Card, Chip, StatusDot, btnCls } from "./ui.jsx";
 
 function buildInitialRows(savedSeries, lastLoad = "") {
@@ -25,6 +26,7 @@ function FreeExerciseCard({
   onSyncSeries,
   onMove,
   onRemove,
+  onStartRest,
 }) {
   const [rows, setRows] = useState(() => buildInitialRows(savedSeries, last?.load || ""));
 
@@ -56,6 +58,7 @@ function FreeExerciseCard({
   };
 
   const addSetRow = () => {
+    unlockTimerAudio();
     const prev = rows[rows.length - 1];
     const prevRepsNum = prev && prev.reps !== "" ? Number(prev.reps) : NaN;
     const nextLoad = (prev && prev.load) || last?.load || "";
@@ -190,13 +193,25 @@ function FreeExerciseCard({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={addSetRow}
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-white/[0.07] px-3.5 py-2 text-xs font-semibold text-fg transition hover:bg-white/[0.12] hover:text-accent"
-        >
-          <Plus size={14} />Serie
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={addSetRow}
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-white/[0.07] px-3.5 py-2 text-xs font-semibold text-fg transition hover:bg-white/[0.12] hover:text-accent"
+          >
+            <Plus size={14} />Serie
+          </button>
+          {onStartRest && (
+            <button
+              type="button"
+              onClick={() => onStartRest(ex.rest || 90)}
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-white/[0.07] px-3 py-2 text-xs font-semibold text-muted transition hover:bg-accent/15 hover:text-accent"
+              aria-label={`Iniciar descanso de ${ex.rest || 90} segundos`}
+            >
+              <Timer size={14} />Desc. {ex.rest || 90}s
+            </button>
+          )}
+        </div>
         <span className="font-mono text-xs font-semibold text-muted tabular-nums">
           {validCount} {validCount === 1 ? "serie hecha" : "series hechas"}
         </span>
@@ -232,6 +247,7 @@ export function FreeWorkoutView({
   onMoveExercise,
   onRemoveExercise,
   onFinish,
+  startTimer,
 }) {
   const freeDay = seriesLog?.[today]?.free || {};
   const hasSets = hasFreeWorkout(seriesLog, today);
@@ -329,6 +345,7 @@ export function FreeWorkoutView({
                 onSyncSeries={(rows) => onSyncSeries(ex.id, rows)}
                 onMove={(dir) => onMoveExercise(ex.id, dir)}
                 onRemove={() => onRemoveExercise(ex.id)}
+                onStartRest={startTimer}
               />
             ))}
           </div>

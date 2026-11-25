@@ -13,7 +13,7 @@ import { DEFAULT_HABIT_DEFS } from "./data/habits.js";
 import { useWeekPlan } from "./lib/planner.js";
 import { DEFAULT_HEALTH_PREFS, computeBevelHistory } from "./lib/bevel.js";
 import { useCalendarSync } from "./lib/calendar.js";
-import { unlockAudio } from "./lib/audio.js";
+import { unlockTimerAudio, REST_TIMER_STORAGE_KEY, sanitizeRestoredTimer } from "./lib/timerSound.js";
 import { SyncBadge } from "./components/ui.jsx";
 import { RestTimer } from "./components/RestTimer.jsx";
 import { WarmupSheet } from "./components/WarmupSheet.jsx";
@@ -77,8 +77,22 @@ export default function App() {
   );
   const wp = useWeekPlan(log, { bevel: bevelHistory });
   useCalendarSync(wp.upcoming, routineVariants); // plan → cal/plan.json → calendario «Shift» (repo privado)
-  const [timer, setTimer] = useState(null);
+  const [timer, setTimer] = useState(() => {
+    try {
+      const raw = localStorage.getItem(REST_TIMER_STORAGE_KEY);
+      return raw ? sanitizeRestoredTimer(JSON.parse(raw), Date.now()) : null;
+    } catch (e) {
+      return null;
+    }
+  });
   const [warmup, setWarmup] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (timer) localStorage.setItem(REST_TIMER_STORAGE_KEY, JSON.stringify(timer));
+      else localStorage.removeItem(REST_TIMER_STORAGE_KEY);
+    } catch (e) {}
+  }, [timer]);
 
   useEffect(() => {
     const save = () => { try { localStorage.setItem("fitpanel:tab", tab); localStorage.setItem("fitpanel:tabAt", String(Date.now())); } catch (e) {} };
@@ -88,8 +102,12 @@ export default function App() {
     return () => clearInterval(id);
   }, [tab]);
   // El navegador solo deja sonar audio después de un toque: se desbloquea con el primero.
-  useEffect(() => { window.addEventListener("pointerdown", unlockAudio); return () => window.removeEventListener("pointerdown", unlockAudio); }, []);
-  const startTimer = useCallback((sec) => { unlockAudio(); setTimer({ endAt: Date.now() + sec * 1000, duration: sec * 1000 }); }, []);
+  useEffect(() => { window.addEventListener("pointerdown", unlockTimerAudio); return () => window.removeEventListener("pointerdown", unlockTimerAudio); }, []);
+  const startTimer = useCallback((sec) => {
+    unlockTimerAudio();
+    const now = Date.now();
+    setTimer({ id: now, endAt: now + sec * 1000, duration: sec * 1000 });
+  }, []);
 
   // Limpia ?ver=revision tras abrir la vista y escucha mensajes del service worker al tocar un aviso.
   useEffect(() => {
@@ -288,7 +306,7 @@ export default function App() {
         <div className="mx-auto max-w-6xl">
           {tab === "home" && <HomeView wp={wp} log={log} setLog={seriesLog} habits={habits} setHabits={setHabits} habitDefs={habitDefs} block={block} setBlock={setBlock} goTrain={goTrain} goHealth={goHealth} wins={wins} setWins={setWins} reviews={reviews} openReview={openReview} routineVariants={routineVariants} bevelHistory={bevelHistory} />}
           {tab === "review" && <ReviewView wp={wp} log={log} setLog={seriesLog} habits={habits} habitDefs={habitDefs} wins={wins} setWins={setWins} reviews={reviews} setReviews={setReviews} onBack={goHome} />}
-          {tab === "train" && <TrainView key={trainRid || "auto"} initialRid={trainRid} sets={sets} setSets={setSets} seriesLog={seriesLog} setSeriesLog={setSeriesLog} log={log} setLog={setLog} block={block} swaps={swaps} setSwaps={setSwaps} loads={loads} setLoads={setLoads} lastLoads={lastLoads} setLastLoads={setLastLoads} routineVariants={routineVariants} setRoutineVariants={setRoutineVariants} skips={skips} setSkips={setSkips} customExercises={customExercises} setCustomExercises={setCustomExercises} freeSessions={freeSessions} setFreeSessions={setFreeSessions} soreness={soreness} startTimer={startTimer} openWarmup={() => setWarmup(true)} wp={wp} bevelHistory={bevelHistory} />}
+          {tab === "train" && <TrainView key={trainRid || "auto"} initialRid={trainRid} sets={sets} setSets={setSets} seriesLog={seriesLog} setSeriesLog={setSeriesLog} log={log} setLog={setLog} block={block} swaps={swaps} setSwaps={setSwaps} loads={loads} setLoads={setLoads} lastLoads={lastLoads} setLastLoads={setLastLoads} routineVariants={routineVariants} setRoutineVariants={setRoutineVariants} skips={skips} setSkips={setSkips} customExercises={customExercises} setCustomExercises={setCustomExercises} freeSessions={freeSessions} setFreeSessions={setFreeSessions} soreness={soreness} timer={timer} setTimer={setTimer} startTimer={startTimer} openWarmup={() => setWarmup(true)} wp={wp} bevelHistory={bevelHistory} />}
           {tab === "fitbit" && <DashboardView health={health} setHealth={setHealth} log={log} bevelHistory={bevelHistory} vitals={vitals} sleep={sleep} workouts={workouts} setLog={seriesLog} customExercises={customExercises} soreness={soreness} setSoreness={setSoreness} fitbitSync={fitbitSync} onSyncFitbit={() => syncFitbitNow({ manual: true })} onDismissFitbitMessage={dismissFitbitMessage} hasSyncConfig={Boolean(Sync.cfg())} onOpenSettings={goSettings} />}
           {tab === "settings" && <SettingsView habitDefs={habitDefs} setHabitDefs={setHabitDefs} reminderCard={<ReminderCard rem={rem} />} healthPrefs={healthPrefs} setHealthPrefs={setHealthPrefs} />}
           {tab === "habits" && <HabitsView habits={habits} setHabits={setHabits} habitDefs={habitDefs} tomorrow={wp.info(dkey(addDays(new Date(), 1)))} tonight={wp.info(dkey())} routineVariants={routineVariants} />}
