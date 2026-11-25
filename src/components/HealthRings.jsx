@@ -1,5 +1,5 @@
-import { ChevronLeft, ChevronRight, AlertTriangle, BatteryCharging, Info } from "lucide-react";
-import { dkey, fromKey, addDays, DAYS, fmtShort } from "../lib/dates.js";
+import { ChevronLeft, ChevronRight, AlertTriangle, BatteryCharging, Info, RefreshCw, ExternalLink, X } from "lucide-react";
+import { dkey, fromKey, addDays, DAYS, fmtShort, hhmm } from "../lib/dates.js";
 import { Ring, Card, SectionTitle } from "./ui.jsx";
 
 function fmtHM(min) {
@@ -56,6 +56,11 @@ export function HealthRings({
   onToday,
   onOpenSheet,
   vitals,
+  fitbitSync = null,
+  onSyncFitbit = null,
+  onDismissFitbitMessage = null,
+  hasSyncConfig = false,
+  onOpenSettings = null,
 }) {
   const sleep = day?.sleep || null;
   const recovery = day?.recovery || null;
@@ -95,45 +100,149 @@ export function HealthRings({
         ? "text-accent"
         : "text-warn";
 
+  const fitbitSyncing = Boolean(fitbitSync?.syncing);
+  let fitbitStatusLabel = hasSyncConfig ? "Fitbit bajo demanda" : "Conecta GitHub en Ajustes";
+  let fitbitStatusTone = "muted";
+  if (fitbitSyncing) {
+    fitbitStatusLabel = fitbitSync?.statusText || "Enviando…";
+    fitbitStatusTone = "accent";
+  } else if (fitbitSync?.statusText) {
+    fitbitStatusLabel = fitbitSync.statusText;
+    fitbitStatusTone = "good";
+  } else if (fitbitSync?.lastSyncedAt) {
+    fitbitStatusLabel = `Fitbit · ${hhmm(new Date(fitbitSync.lastSyncedAt))}`;
+    fitbitStatusTone = "muted";
+  }
+
   return (
     <div className="space-y-4">
-      {/* Selector compacto de fecha (últimos 30 días) */}
-      <div className="card flex items-center justify-between gap-2 px-2.5 py-2">
-        <button
-          type="button"
-          onClick={onPrev}
-          disabled={!canPrev}
-          aria-label="Día anterior"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/[0.07] text-fg transition hover:bg-white/[0.12] hover:text-accent disabled:opacity-30"
-        >
-          <ChevronLeft size={18} />
-        </button>
+      {/* Selector compacto de fecha (últimos 30 días) + sincronización Fitbit */}
+      <div className="card space-y-2 px-2.5 py-2 sm:flex sm:items-center sm:justify-between sm:gap-3 sm:space-y-0">
+        <div className="flex min-w-0 items-center justify-between gap-2 sm:flex-1 sm:justify-start">
+          <button
+            type="button"
+            onClick={onPrev}
+            disabled={!canPrev}
+            aria-label="Día anterior"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/[0.07] text-fg transition hover:bg-white/[0.12] hover:text-accent disabled:opacity-30"
+          >
+            <ChevronLeft size={18} />
+          </button>
 
-        <div className="flex min-w-0 items-center gap-2 text-center">
-          <span className="truncate font-mono text-xs font-bold text-fg sm:text-sm">
-            {formatDayLabel(selectedDate, todayKey)}
-          </span>
-          {!isToday && (
+          <div className="flex min-w-0 items-center gap-2 text-center">
+            <span className="truncate font-mono text-xs font-bold text-fg sm:text-sm">
+              {formatDayLabel(selectedDate, todayKey)}
+            </span>
+            {!isToday && (
+              <button
+                type="button"
+                onClick={onToday}
+                className="shrink-0 rounded-full bg-accent/15 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/25"
+              >
+                Hoy
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={!canNext}
+            aria-label="Día siguiente"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/[0.07] text-fg transition hover:bg-white/[0.12] hover:text-accent disabled:opacity-30"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+
+        {onSyncFitbit && (
+          <div className="flex min-w-0 items-center justify-between gap-2 border-t border-line pt-2 sm:shrink-0 sm:justify-end sm:border-t-0 sm:pt-0">
+            <span
+              role="status"
+              aria-live="polite"
+              className={`min-w-0 truncate text-xs ${
+                fitbitStatusTone === "good"
+                  ? "font-medium text-good"
+                  : fitbitStatusTone === "accent"
+                    ? "font-medium text-accent"
+                    : "text-muted"
+              }`}
+            >
+              {fitbitStatusLabel}
+            </span>
             <button
               type="button"
-              onClick={onToday}
-              className="shrink-0 rounded-full bg-accent/15 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/25"
+              onClick={onSyncFitbit}
+              disabled={fitbitSyncing}
+              aria-busy={fitbitSyncing}
+              className="inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-xl bg-white/[0.08] px-3 py-1.5 text-xs font-semibold text-fg transition hover:bg-white/[0.14] hover:text-accent active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
             >
-              Hoy
+              <RefreshCw size={13} className={fitbitSyncing ? "animate-spin text-accent" : "text-accent"} />
+              <span>Sincronizar Fitbit</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Aviso discreto y accionable si falta permiso, falló el workflow o Fitbit aún no sube el sueño */}
+      {fitbitSync?.error && (
+        <div role="alert" className="rounded-2xl border border-warn/30 bg-warn/10 px-3.5 py-3 text-xs">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warn" />
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <p className="leading-relaxed text-fg/95">{fitbitSync.error.message}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {(fitbitSync.error.code === "forbidden" || fitbitSync.error.code === "unauthorized" || fitbitSync.error.code === "no_config") && onOpenSettings && (
+                  <button
+                    type="button"
+                    onClick={onOpenSettings}
+                    className="rounded-lg bg-warn/20 px-2.5 py-1 text-[11px] font-semibold text-warn transition hover:bg-warn/30"
+                  >
+                    Abrir Ajustes
+                  </button>
+                )}
+                {fitbitSync.error.runUrl && (
+                  <a
+                    href={fitbitSync.error.runUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 rounded-lg bg-white/[0.08] px-2.5 py-1 text-[11px] font-semibold text-fg/90 hover:bg-white/[0.14]"
+                  >
+                    <ExternalLink size={11} />Ver corrida en GitHub
+                  </a>
+                )}
+              </div>
+            </div>
+            {onDismissFitbitMessage && (
+              <button
+                type="button"
+                onClick={onDismissFitbitMessage}
+                aria-label="Cerrar aviso"
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-muted hover:bg-white/[0.08] hover:text-fg"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!fitbitSync?.error && fitbitSync?.notice && (
+        <div role="status" className="flex items-start gap-2.5 rounded-2xl bg-white/[0.05] px-3.5 py-3 text-xs text-muted">
+          <Info size={15} className="mt-0.5 shrink-0 text-cool" />
+          <p className="min-w-0 flex-1 leading-relaxed text-fg/90">{fitbitSync.notice.message}</p>
+          {onDismissFitbitMessage && (
+            <button
+              type="button"
+              onClick={onDismissFitbitMessage}
+              aria-label="Cerrar aviso"
+              className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-muted hover:bg-white/[0.08] hover:text-fg"
+            >
+              <X size={14} />
             </button>
           )}
         </div>
-
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={!canNext}
-          aria-label="Día siguiente"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/[0.07] text-fg transition hover:bg-white/[0.12] hover:text-accent disabled:opacity-30"
-        >
-          <ChevronRight size={18} />
-        </button>
-      </div>
+      )}
 
       {/* Hero de 3 anillos interactivos */}
       <Card glow="good" className="p-3 sm:p-4">

@@ -22,7 +22,7 @@ export const emitKey = (k, v) => (keyBus.get(k) || []).forEach((f) => f(v));
 export const Sync = {
   status: { state: "off" },
   subs: new Set(),
-  sha: null, busy: false, again: false, timer: null,
+  sha: null, busy: false, again: false, timer: null, _active: null,
   set(st) { this.status = st; this.subs.forEach((f) => f(st)); },
   cfg() { const c = LS.get("@gh"); return c && c.token && c.repo ? c : null; },
   req(method, body) {
@@ -62,23 +62,41 @@ export const Sync = {
   },
   async run() {
     if (!this.cfg()) { this.set({ state: "off" }); return; }
-    if (this.busy) { this.again = true; return; }
+    if (this.busy) { this.again = true; return this._active; }
+    clearTimeout(this.timer);
     this.busy = true;
     this.set({ state: "syncing", at: this.status.at });
-    try {
-      for (let i = 0; i < 3; i++) { const newer = await this.pull(); if (!newer) break; if (await this.push()) break; }
-      this.set({ state: "ok", at: Date.now() });
-    } catch (e) {
-      this.set({ state: "error", code: e && e.status ? e.status : "red", at: this.status.at });
-    } finally {
-      this.busy = false;
-      if (this.again) { this.again = false; this.schedule(500); }
+    const work = (async () => {
+      try {
+        for (let i = 0; i < 3; i++) { const newer = await this.pull(); if (!newer) break; if (await this.push()) break; }
+        this.set({ state: "ok", at: Date.now() });
+      } catch (e) {
+        this.set({ state: "error", code: e && e.status ? e.status : "red", at: this.status.at });
+      } finally {
+        this.busy = false;
+        this._active = null;
+        if (this.again) { this.again = false; this.schedule(500); }
+      }
+    })();
+    this._active = work;
+    return work;
+  },
+  // Recarga data.json desde GitHub en el acto (tras un workflow) sin perder ediciones locales recientes.
+  async pullNow() {
+    if (!this.cfg()) { this.set({ state: "off" }); return { ok: false, status: this.status }; }
+    clearTimeout(this.timer);
+    if (this.busy && this._active) {
+      try { await this._active; } catch (e) {}
     }
+    await this.run();
+    return { ok: this.status.state === "ok", status: this.status };
   },
   schedule(ms = 3000) { if (!this.cfg()) return; clearTimeout(this.timer); this.timer = setTimeout(() => this.run(), ms); },
   connect(token, repo) { LS.set("@gh", { token, repo }); this.sha = null; return this.run(); },
   disconnect() { LS.del("@gh"); this.sha = null; this.set({ state: "off" }); },
 };
+
+export const pullRemoteData = () => Sync.pullNow();
 
 export function useSyncStatus() {
   const [s, setS] = useState(Sync.status);

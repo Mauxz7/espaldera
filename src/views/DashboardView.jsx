@@ -304,7 +304,24 @@ export function WorkoutsSection({ workouts, log, bevelHistory, setLog = null }) 
   );
 }
 
-export function DashboardView({ health, setHealth, log, bevelHistory, vitals = {}, sleep = {}, workouts = [], setLog = {}, customExercises = [], soreness = {}, setSoreness = null }) {
+export function DashboardView({
+  health,
+  setHealth,
+  log,
+  bevelHistory,
+  vitals = {},
+  sleep = {},
+  workouts = [],
+  setLog = {},
+  customExercises = [],
+  soreness = {},
+  setSoreness = null,
+  fitbitSync = null,
+  onSyncFitbit = null,
+  onDismissFitbitMessage = null,
+  hasSyncConfig = false,
+  onOpenSettings = null,
+}) {
   const [subTab, setSubTab] = useState("daily"); // "daily" | "weekly"
   const [activeSheet, setActiveSheet] = useState(null); // null | "recovery" | "sleep" | "strain"
   const [showImport, setShowImport] = useState(false);
@@ -443,6 +460,11 @@ export function DashboardView({ health, setHealth, log, bevelHistory, vitals = {
               onToday={goTodayDate}
               onOpenSheet={setActiveSheet}
               vitals={vitals}
+              fitbitSync={fitbitSync}
+              onSyncFitbit={onSyncFitbit}
+              onDismissFitbitMessage={onDismissFitbitMessage}
+              hasSyncConfig={hasSyncConfig}
+              onOpenSettings={onOpenSettings}
             />
             <HealthMonitor
               vitals={vitals}

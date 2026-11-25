@@ -1,6 +1,13 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Dumbbell, Activity, Sunrise, Settings, LayoutDashboard } from "lucide-react";
-import { Sync, usePersisted } from "./lib/storage.js";
+import { Sync, LS, usePersisted, useSyncStatus } from "./lib/storage.js";
+import {
+  triggerFitbitSync,
+  shouldAutoSyncFitbit,
+  readFitbitSyncMeta,
+  getTodayFitbitStatus,
+  isFitbitSyncInFlight,
+} from "./lib/fitbitSync.js";
 import { dkey, addDays } from "./lib/dates.js";
 import { DEFAULT_HABIT_DEFS } from "./data/habits.js";
 import { useWeekPlan } from "./lib/planner.js";
@@ -41,6 +48,7 @@ export default function App() {
   const goHealth = useCallback(() => { setTab("fitbit"); window.scrollTo(0, 0); }, []);
   const openReview = useCallback(() => { setTab("review"); window.scrollTo(0, 0); }, []);
   const goHome = useCallback(() => { setTab("home"); window.scrollTo(0, 0); }, []);
+  const goSettings = useCallback(() => { setTab("settings"); window.scrollTo(0, 0); }, []);
   const [sets, setSets] = usePersisted("sets", {});
   const [seriesLog, setSeriesLog] = usePersisted("setLog", {});
   const [log, setLog] = usePersisted("log", {});
@@ -117,6 +125,141 @@ export default function App() {
     return () => { document.removeEventListener("visibilitychange", onVis); clearInterval(id); };
   }, []);
 
+  const syncStatus = useSyncStatus();
+  const [fitbitSync, setFitbitSync] = useState(() => {
+    const meta = readFitbitSyncMeta();
+    return {
+      syncing: false,
+      statusText: "",
+      error: null,
+      notice: null,
+      lastSyncedAt: meta.lastSuccessMs || null,
+    };
+  });
+  const fitbitInFlightRef = useRef(false);
+
+  const dismissFitbitMessage = useCallback(() => {
+    setFitbitSync((cur) => ({ ...cur, error: null, notice: null }));
+  }, []);
+
+  const syncFitbitNow = useCallback(async ({ manual = false } = {}) => {
+    const cfg = Sync.cfg();
+    if (!cfg) {
+      if (manual) {
+        setFitbitSync((cur) => ({
+          ...cur,
+          syncing: false,
+          statusText: "",
+          error: {
+            code: "no_config",
+            message: "Conecta primero tu repositorio privado de GitHub en Ajustes para sincronizar Fitbit.",
+            runUrl: null,
+          },
+          notice: null,
+        }));
+      }
+      return { ok: false, code: "no_config" };
+    }
+    if (fitbitInFlightRef.current || isFitbitSyncInFlight()) {
+      return { ok: false, code: "in_flight" };
+    }
+    fitbitInFlightRef.current = true;
+    setFitbitSync((cur) => ({
+      ...cur,
+      syncing: true,
+      statusText: "Enviando…",
+      error: null,
+      notice: null,
+    }));
+    try {
+      const res = await triggerFitbitSync({
+        repo: cfg.repo,
+        token: cfg.token,
+        onStatus: (st) => {
+          setFitbitSync((cur) => ({ ...cur, statusText: st?.text || cur.statusText }));
+        },
+      });
+      if (!res.ok) {
+        setFitbitSync((cur) => ({
+          ...cur,
+          syncing: false,
+          statusText: "",
+          error: { code: res.code, message: res.message, runUrl: res.runUrl || null },
+          notice: null,
+        }));
+        return res;
+      }
+      setFitbitSync((cur) => ({ ...cur, statusText: "Actualizando datos…" }));
+      const pullRes = await Sync.pullNow();
+      const currentToday = dkey();
+      const todayStatus = getTodayFitbitStatus(currentToday, LS.get("sleep"), LS.get("vitals"));
+      if (res.pending) {
+        setFitbitSync((cur) => ({
+          ...cur,
+          syncing: false,
+          statusText: "",
+          error: null,
+          notice: { kind: "info", message: res.message },
+        }));
+      } else if (!pullRes.ok) {
+        setFitbitSync((cur) => ({
+          ...cur,
+          syncing: false,
+          statusText: "",
+          error: {
+            code: "pull_failed",
+            message: "Fitbit terminó en GitHub, pero falló la recarga local. Toca de nuevo para actualizar.",
+            runUrl: res.runUrl || null,
+          },
+          notice: null,
+        }));
+      } else {
+        let notice = null;
+        if (!todayStatus.hasSleep) {
+          notice = {
+            kind: "info",
+            message: "Sincronización completada, pero Fitbit aún no ha subido el sueño de hoy desde tu reloj. Abre la app de Fitbit y vuelve a intentar en un minuto.",
+          };
+        } else if (!todayStatus.hasVitals) {
+          notice = {
+            kind: "info",
+            message: "Sueño actualizado; Fitbit aún no reporta HRV ni FC en reposo de hoy.",
+          };
+        }
+        setFitbitSync({
+          syncing: false,
+          statusText: "Actualizado",
+          error: null,
+          notice,
+          lastSyncedAt: Date.now(),
+        });
+      }
+      return res;
+    } finally {
+      fitbitInFlightRef.current = false;
+    }
+  }, []);
+
+  // Dispara sincronización automática de Fitbit al abrir Salud si faltan datos de hoy y pasó el cooldown.
+  useEffect(() => {
+    if (tab !== "fitbit") return;
+    const cfg = Sync.cfg();
+    if (!cfg) return;
+    if (syncStatus.state === "syncing" || syncStatus.state === "off") return;
+    const meta = readFitbitSyncMeta();
+    const should = shouldAutoSyncFitbit({
+      todayKey: today,
+      sleep,
+      vitals,
+      nowMs: Date.now(),
+      lastAttemptMs: meta.lastAttemptMs,
+      lastForbiddenMs: meta.lastForbiddenMs,
+      hasSyncConfig: Boolean(cfg),
+      inFlight: fitbitInFlightRef.current || isFitbitSyncInFlight(),
+    });
+    if (should) syncFitbitNow({ manual: false });
+  }, [tab, today, sleep, vitals, syncStatus.state, syncFitbitNow]);
+
   const rem = useHabitReminders(habitDefs, habits[today] || {});
 
   return (
@@ -146,7 +289,7 @@ export default function App() {
           {tab === "home" && <HomeView wp={wp} log={log} setLog={seriesLog} habits={habits} setHabits={setHabits} habitDefs={habitDefs} block={block} setBlock={setBlock} goTrain={goTrain} goHealth={goHealth} wins={wins} setWins={setWins} reviews={reviews} openReview={openReview} routineVariants={routineVariants} bevelHistory={bevelHistory} />}
           {tab === "review" && <ReviewView wp={wp} log={log} setLog={seriesLog} habits={habits} habitDefs={habitDefs} wins={wins} setWins={setWins} reviews={reviews} setReviews={setReviews} onBack={goHome} />}
           {tab === "train" && <TrainView key={trainRid || "auto"} initialRid={trainRid} sets={sets} setSets={setSets} seriesLog={seriesLog} setSeriesLog={setSeriesLog} log={log} setLog={setLog} block={block} swaps={swaps} setSwaps={setSwaps} loads={loads} setLoads={setLoads} lastLoads={lastLoads} setLastLoads={setLastLoads} routineVariants={routineVariants} setRoutineVariants={setRoutineVariants} skips={skips} setSkips={setSkips} customExercises={customExercises} setCustomExercises={setCustomExercises} freeSessions={freeSessions} setFreeSessions={setFreeSessions} soreness={soreness} startTimer={startTimer} openWarmup={() => setWarmup(true)} wp={wp} bevelHistory={bevelHistory} />}
-          {tab === "fitbit" && <DashboardView health={health} setHealth={setHealth} log={log} bevelHistory={bevelHistory} vitals={vitals} sleep={sleep} workouts={workouts} setLog={seriesLog} customExercises={customExercises} soreness={soreness} setSoreness={setSoreness} />}
+          {tab === "fitbit" && <DashboardView health={health} setHealth={setHealth} log={log} bevelHistory={bevelHistory} vitals={vitals} sleep={sleep} workouts={workouts} setLog={seriesLog} customExercises={customExercises} soreness={soreness} setSoreness={setSoreness} fitbitSync={fitbitSync} onSyncFitbit={() => syncFitbitNow({ manual: true })} onDismissFitbitMessage={dismissFitbitMessage} hasSyncConfig={Boolean(Sync.cfg())} onOpenSettings={goSettings} />}
           {tab === "settings" && <SettingsView habitDefs={habitDefs} setHabitDefs={setHabitDefs} reminderCard={<ReminderCard rem={rem} />} healthPrefs={healthPrefs} setHealthPrefs={setHealthPrefs} />}
           {tab === "habits" && <HabitsView habits={habits} setHabits={setHabits} habitDefs={habitDefs} tomorrow={wp.info(dkey(addDays(new Date(), 1)))} tonight={wp.info(dkey())} routineVariants={routineVariants} />}
         </div>
