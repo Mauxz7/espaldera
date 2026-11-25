@@ -3,6 +3,8 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Trash2, Check } from "lucid
 import { usePersisted } from "../lib/storage.js";
 import { dkey, fmtShort } from "../lib/dates.js";
 import { fmtSleep } from "../lib/sleep.js";
+import { weekState } from "../lib/planner.js";
+import { weekProgress } from "../lib/home.js";
 import { DEFAULT_IDENTITIES } from "../data/identities.js";
 import { DEFAULT_DOPAMINE_DEFS } from "../data/dopamine.js";
 import {
@@ -55,6 +57,33 @@ export function ReviewView({ wp, log, setLog = null, habits, habitDefs, wins, se
       }),
     [activeKey, isCurrent, wp.todayIdx, wp.fixed, wp.fromFitbit, habits, habitDefs, identities, log, setLog, workouts, weekPlan, dopamine, dopamineDefs, sleep, wins, reviews],
   );
+
+  // Calcula sesiones y meta dinámica semanal (soporta rutinas repetidas y metas distintas de 4).
+  const weekSessions = useMemo(() => {
+    if (isCurrent) {
+      return weekProgress({
+        keys: summary.keys,
+        todayIdx: summary.todayIdx,
+        fixed: wp.fixed,
+        habits,
+        habitDefs,
+        workouts,
+        setLog,
+        targets: wp.targets,
+      }).sessions;
+    }
+    const past = weekState(weekPlan, log, activeKey, workouts, null, { noTail: true });
+    return weekProgress({
+      keys: summary.keys,
+      todayIdx: summary.todayIdx,
+      fixed: past.fixed,
+      habits,
+      habitDefs,
+      workouts,
+      setLog,
+      targets: past.targets,
+    }).sessions;
+  }, [isCurrent, summary.keys, summary.todayIdx, wp.fixed, wp.targets, weekPlan, log, activeKey, workouts, habits, habitDefs, setLog]);
 
   const [winText, setWinText] = useState("");
   const storedReview = (reviews && reviews[activeKey]) || {};
@@ -214,8 +243,8 @@ export function ReviewView({ wp, log, setLog = null, habits, habitDefs, wins, se
         <Card className="p-4 md:p-4">
           <div className="text-[13px] font-medium text-muted">Sesiones</div>
           <div className="mt-1 font-mono text-2xl font-bold tabular-nums text-accent">
-            {summary.sessions.value}
-            <span className="text-sm font-normal text-muted"> / {summary.sessions.goal}</span>
+            {weekSessions.value}
+            <span className="text-sm font-normal text-muted"> / {weekSessions.goal}</span>
           </div>
           <div className="mt-0.5 text-xs text-muted">Fitbit: {summary.minutes.value} min</div>
         </Card>

@@ -1,18 +1,21 @@
 // Cálculos de la pestaña Inicio (sin interfaz, con pruebas en tests/home.test.mjs).
-import { MAIN } from "./planner.js";
+import { MAIN, normalizeWeekTargets, sumTargets, countMainCodes } from "./planner.js";
 import { hasFreeWorkout } from "./metrics.js";
 import { DEFAULT_HABIT_DEFS, reqDone } from "../data/habits.js";
 import { dkey } from "./dates.js";
 import { isPoorSleep, fmtSleep } from "./sleep.js";
 
 // Progreso de la semana en curso (lunes a hoy) para los tres anillos de Inicio.
-// - sesiones: rutinas principales distintas hechas (en Shift o cubiertas por Fitbit) de 4 + días con entreno libre sin rutina principal.
+// - sesiones: sesiones principales completadas según la meta semanal (en Shift o cubiertas por Fitbit) + días con entreno libre sin rutina principal.
 // - hábitos: días con todos los obligatorios cumplidos, sobre los días transcurridos.
 // - minutos: minutos de entrenos de Fitbit en la semana, contra una meta de 150 (recomendación OMS).
 export const MINUTES_GOAL = 150;
 
-export function weekProgress({ keys, todayIdx, fixed, habits, habitDefs, workouts, setLog = null }) {
-  const done = new Set(Object.values(fixed || {}).filter((r) => MAIN.includes(r)));
+export function weekProgress({ keys, todayIdx, fixed, habits, habitDefs, workouts, setLog = null, targets = null }) {
+  const normTargets = normalizeWeekTargets(targets);
+  const doneCounts = countMainCodes(fixed);
+  const doneSessions = MAIN.reduce((acc, c) => acc + Math.min(doneCounts[c] || 0, normTargets[c] || 0), 0);
+  const goalSessions = sumTargets(normTargets);
   const limit = Math.min((keys || []).length - 1, Number.isFinite(todayIdx) ? todayIdx : (keys || []).length - 1);
   let freeDays = 0;
   for (let i = 0; i <= limit; i++) {
@@ -34,7 +37,7 @@ export function weekProgress({ keys, todayIdx, fixed, habits, habitDefs, workout
     if (i >= 0 && i <= todayIdx && Number(w.min) > 0) minutes += Math.round(Number(w.min));
   }
   return {
-    sessions: { value: done.size + freeDays, goal: MAIN.length },
+    sessions: { value: doneSessions + freeDays, goal: goalSessions },
     habits: { value: habitDays, goal: days },
     minutes: { value: minutes, goal: MINUTES_GOAL },
   };
